@@ -36,23 +36,20 @@ def main():
     
     # Sidebar Navigation
     with st.sidebar:
-        st.write(f"User: **{st.session_state.get('user_name')}**")
+        st.write(f"ユーザー: **{st.session_state.get('user_name')}**")
+        st.caption(f"権限: {st.session_state.get('user_role')}")
         
         # Navigation Menu
-        page_options = ["Home"]
+        # Key-Value pair for cleaner code or just list? List is fine for simple app.
+        page_options = ["ホーム (Home)"]
         
-        # Everyone can see Analytics? Or Admin only?
-        # User requirement: "Group management -> Admin/Authorized".
-        # Let's show Analytics to everyone, Settings to Admin?
-        # For Demo, maybe open to all or Admin.
-        # Let's say Analytics is for everyone.
-        page_options.append("Analytics")
+        page_options.append("分析 (Analytics)")
         
         if st.session_state.get('user_role') == 'admin':
-            page_options.append("Master Management")
-            page_options.append("Settings")
+            page_options.append("マスタ管理 (Master)")
+            page_options.append("設定 (Settings)")
             
-        selected_page = st.radio("Menu", page_options)
+        selected_page = st.radio("メニュー", page_options)
         
         st.divider()
         if st.button("ログアウト", type="primary"):
@@ -60,14 +57,14 @@ def main():
             st.rerun()
 
     # Routing
-    if selected_page == "Home":
+    if selected_page == "ホーム (Home)":
         render_home_view()
-    elif selected_page == "Analytics":
+    elif selected_page == "分析 (Analytics)":
         from src.views.analytics import render_analytics_view
         render_analytics_view()
-    elif selected_page == "Master Management":
+    elif selected_page == "マスタ管理 (Master)":
         render_master_view()
-    elif selected_page == "Settings":
+    elif selected_page == "設定 (Settings)":
         from src.views.settings import render_settings_view
         render_settings_view()
 
