@@ -149,3 +149,80 @@ def process_loan(
     else:
         update_unit_status(device_unit_id, 'loaned')
         return "loaned"
+
+# --- Phase 3: Return Logic ---
+
+from src.database import create_return, get_active_loan
+
+def process_return(
+    device_unit_id: int,
+    return_date: str,
+    check_results: list,
+    photo_dir: str,
+    user_id: int = None,
+    user_name: str = "Unknown"
+):
+    """
+    Process a return request.
+    1. Validation: Unit has Active Loan?
+    2. Create Return & Close Loan
+    3. Create Check Session (type='return')
+    4. Create Check Lines -> Flag Issues
+    5. Update Unit Status (In Stock or Needs Attention)
+    """
+    
+    # 1. Validation
+    active_loan = get_active_loan(device_unit_id)
+    if not active_loan:
+        raise ValueError("No active loan found for this unit.")
+        
+    loan_id = active_loan['id']
+
+    # 2. Create Return (Closes Loan)
+    create_return(
+        loan_id=loan_id,
+        return_date=return_date,
+        checker_user_id=user_id
+    )
+    
+    # 3. Create Check Session
+    session_id = create_check_session(
+        session_type='return',
+        device_unit_id=device_unit_id,
+        loan_id=loan_id,
+        performed_by=user_name,
+        device_photo_dir=photo_dir
+    )
+    
+    # 4. Process Check Lines
+    has_ng = False
+    
+    for res in check_results:
+        is_ng = (res['result'] == 'NG')
+        if is_ng:
+            has_ng = True
+            
+        create_check_line(
+            check_session_id=session_id,
+            item_id=res['item_id'],
+            required_qty=res['required_qty'],
+            result=res['result'],
+            ng_reason=res.get('ng_reason'),
+            found_qty=res.get('found_qty'),
+            comment=res.get('comment')
+        )
+        
+        if is_ng:
+            # Create Issue
+            summary = f"[Return] NG Item: {res['name']} - {res.get('ng_reason')}"
+            create_issue(device_unit_id, session_id, summary, user_name)
+            
+    # 5. Update Status (Recalculate)
+    # Check if ANY open issues exist (from this return OR previous)
+    issues = get_open_issues(device_unit_id)
+    if issues:
+        update_unit_status(device_unit_id, 'needs_attention')
+        return "needs_attention"
+    else:
+        update_unit_status(device_unit_id, 'in_stock')
+        return "in_stock"

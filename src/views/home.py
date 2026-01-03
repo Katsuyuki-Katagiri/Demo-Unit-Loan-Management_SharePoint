@@ -39,6 +39,12 @@ def render_home_view():
             render_loan_view(unit_id)
             return
 
+        # Check if in Return Mode
+        if st.session_state.get('return_mode'):
+            from src.views.return_view import render_return_view
+            render_return_view(unit_id)
+            return
+
         unit = get_device_unit_by_id(unit_id)
         type_info = get_device_type_by_id(unit['device_type_id'])
         
@@ -49,18 +55,25 @@ def render_home_view():
         with c2:
             st.write("") # spacer
             st.write("")
-            # Check conditions for Loan
-            from src.database import get_open_issues
+            # Check conditions for Loan/Return
+            from src.database import get_open_issues, get_active_loan
             issues = get_open_issues(unit_id)
+            active_loan = get_active_loan(unit_id)
             
             can_loan = (unit['status'] == 'in_stock') and (not issues)
+            can_return = (unit['status'] == 'loaned') or (active_loan) # Can return if loaned
             
             if can_loan:
                 if st.button("📦 貸出登録 (Checkout)", type="primary"):
                     st.session_state['loan_mode'] = True
                     st.rerun()
-            elif unit['status'] != 'in_stock':
-                st.button(f"貸出不可 ({unit['status']})", disabled=True)
+            elif can_return:
+                 if st.button("↩️ 返却登録 (Return)", type="primary"):
+                    st.session_state['return_mode'] = True
+                    st.rerun()
+            elif unit['status'] != 'in_stock' and not active_loan:
+                 # e.g. needs_attention but not strictly via known loan?
+                 st.button(f"状態: {unit['status']}", disabled=True)
             elif issues:
                 st.button("貸出不可 (要対応あり)", disabled=True)
 

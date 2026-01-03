@@ -161,6 +161,19 @@ def init_db():
             FOREIGN KEY (check_session_id) REFERENCES check_sessions (id)
         )
     ''')
+
+    # Phase 3 Tables
+    # Returns (返却)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS returns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            loan_id INTEGER NOT NULL,
+            return_date TEXT NOT NULL,
+            checker_user_id INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (loan_id) REFERENCES loans (id)
+        )
+    ''')
     
     conn.commit()
     conn.close()
@@ -450,4 +463,51 @@ def create_check_line(
     """, (check_session_id, item_id, required_qty, result, ng_reason, found_qty, comment))
     conn.commit()
     conn.close()
+
+# -- Phase 3 Operations --
+
+def create_return(
+    loan_id: int,
+    return_date: str,
+    checker_user_id: Optional[int] = None
+) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    # 1. Create Return Record
+    c.execute("""
+        INSERT INTO returns (loan_id, return_date, checker_user_id)
+        VALUES (?, ?, ?)
+    """, (loan_id, return_date, checker_user_id))
+    return_id = c.lastrowid
+    
+    # 2. Close the Loan
+    c.execute("UPDATE loans SET status = 'closed' WHERE id = ?", (loan_id,))
+    
+    conn.commit()
+    conn.close()
+    return return_id
+
+def get_active_loan(device_unit_id: int):
+    """Get the 'open' loan for a unit (if any)."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("""
+        SELECT * FROM loans 
+        WHERE device_unit_id = ? AND status = 'open'
+        ORDER BY id DESC LIMIT 1
+    """, (device_unit_id,))
+    res = c.fetchone()
+    conn.close()
+    return res
+
+def get_loan_by_id(loan_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM loans WHERE id = ?", (loan_id,))
+    res = c.fetchone()
+    conn.close()
+    return res
 
