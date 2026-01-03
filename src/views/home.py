@@ -39,7 +39,6 @@ def render_home_view():
             render_loan_view(unit_id)
             return
 
-        # Check if in Return Mode
         if st.session_state.get('return_mode'):
             from src.views.return_view import render_return_view
             render_return_view(unit_id)
@@ -52,16 +51,65 @@ def render_home_view():
         with c1:
             st.title(f"{type_info['name']} (Lot: {unit['lot_number']})")
             st.info(f"保管場所: {unit['location']} | Status: {unit['status']}")
+            
+            # --- Issues Section ---
+            from src.database import get_open_issues
+            from src.logic import perform_issue_resolution, perform_cancellation
+            
+            issues = get_open_issues(unit_id)
+            if issues:
+                st.error(f"⚠️ 要対応 (Issues): {len(issues)}件")
+                for i in issues:
+                    with st.container(border=True):
+                        st.write(f"**{i['summary']}**")
+                        st.caption(f"Created: {i['created_at']} by {i['created_by']}")
+                        # Resolve Button (Mock Admin check: anyone can for demo)
+                        if st.button("解決済みにする (Resolve)", key=f"resolve_{i['id']}"):
+                            perform_issue_resolution(unit_id, i['id'], st.session_state.get('user_name', 'Admin'))
+                            st.success("Issue Resolved!")
+                            st.rerun()
+            
+            # --- History Section ---
+            with st.expander("貸出履歴 / 取消 (History)"):
+                from src.database import get_loan_history
+                history = get_loan_history(unit_id)
+                if not history:
+                    st.write("履歴なし")
+                else:
+                    for l in history:
+                        status_icon = "🟢" if l['status'] == 'open' else "⚫"
+                        if l['canceled']:
+                            status_icon = "❌ (Canceled)"
+                            
+                        st.markdown(f"**{l['checkout_date']}** - {l['destination']} ({l['purpose']})")
+                        st.caption(f"Status: {l['status']} | {status_icon}")
+                        
+                        # Cancel Button (Only if not already canceled)
+                        if not l['canceled']:
+                            # If Open, allow cancellation
+                            # If Closed (returned), usually allow cancelling the RETURN, not the LOAN directly?
+                            # Requirement: "All cancellation OK"
+                            # If status is closed, it means it was returned. Cancelling Loan would orphan the return?
+                            # Logic perform_cancellation('loan') cascades to Returns too. So it's safe.
+                            if st.button(f"取消 (Cancel Loan #{l['id']})", key=f"cancel_loan_{l['id']}"):
+                                perform_cancellation('loan', l['id'], st.session_state.get('user_name', 'Admin'), "Admin Cancel", unit_id)
+                                st.warning("Loan Canceled")
+                                st.rerun()
+                        st.divider()
+
         with c2:
             st.write("") # spacer
             st.write("")
             # Check conditions for Loan/Return
-            from src.database import get_open_issues, get_active_loan
-            issues = get_open_issues(unit_id)
+            from src.database import get_active_loan
+            # issues fetched above
             active_loan = get_active_loan(unit_id)
             
+            # Re-check issues (might be resolved just now)
+            # But 'issues' variable is from before resolution. Rerun handles display update.
+            # Button logic:
             can_loan = (unit['status'] == 'in_stock') and (not issues)
-            can_return = (unit['status'] == 'loaned') or (active_loan) # Can return if loaned
+            can_return = (unit['status'] == 'loaned') or (active_loan)
             
             if can_loan:
                 if st.button("📦 貸出登録 (Checkout)", type="primary"):
@@ -72,7 +120,6 @@ def render_home_view():
                     st.session_state['return_mode'] = True
                     st.rerun()
             elif unit['status'] != 'in_stock' and not active_loan:
-                 # e.g. needs_attention but not strictly via known loan?
                  st.button(f"状態: {unit['status']}", disabled=True)
             elif issues:
                 st.button("貸出不可 (要対応あり)", disabled=True)

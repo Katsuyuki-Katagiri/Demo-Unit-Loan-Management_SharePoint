@@ -393,7 +393,7 @@ def get_open_issues(device_unit_id: int):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT * FROM issues WHERE device_unit_id = ? AND status = 'open'", (device_unit_id,))
+    c.execute("SELECT * FROM issues WHERE device_unit_id = ? AND status = 'open' AND (canceled = 0 OR canceled IS NULL)", (device_unit_id,))
     res = c.fetchall()
     conn.close()
     return res
@@ -495,7 +495,7 @@ def get_active_loan(device_unit_id: int):
     c = conn.cursor()
     c.execute("""
         SELECT * FROM loans 
-        WHERE device_unit_id = ? AND status = 'open'
+        WHERE device_unit_id = ? AND status = 'open' AND (canceled = 0 OR canceled IS NULL)
         ORDER BY id DESC LIMIT 1
     """, (device_unit_id,))
     res = c.fetchone()
@@ -511,3 +511,95 @@ def get_loan_by_id(loan_id: int):
     conn.close()
     return res
 
+
+# -- Phase 4 Operations --
+
+def resolve_issue(issue_id: int, user_name: str):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        UPDATE issues 
+        SET status = 'closed', resolved_at = CURRENT_TIMESTAMP, resolved_by = ?
+        WHERE id = ?
+    """, (user_name, issue_id))
+    conn.commit()
+    conn.close()
+
+def cancel_record(table: str, record_id: int, user_name: str, reason: str):
+    """
+    Generic cancellation. 
+    Tables must have: canceled, canceled_at, canceled_by, cancel_reason
+    """
+    valid_tables = ['loans', 'returns', 'check_sessions', 'issues']
+    if table not in valid_tables:
+        raise ValueError(f"Invalid table for cancellation: {table}")
+        
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    query = f"""
+        UPDATE {table}
+        SET canceled = 1, canceled_at = CURRENT_TIMESTAMP, 
+            canceled_by = ?, cancel_reason = ?
+        WHERE id = ?
+    """
+    c.execute(query, (user_name, reason, record_id))
+    conn.commit()
+    conn.close()
+
+def get_related_records(loan_id: int = None, return_id: int = None):
+    """
+    Find related records for cascading cancellation.
+    Returns dict of lists: {'returns': [], 'check_sessions': [], 'issues': []}
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    res = {'returns': [], 'check_sessions': [], 'issues': []}
+    
+    if loan_id:
+        # Find Returns linked to this loan
+        c.execute("SELECT id FROM returns WHERE loan_id = ? AND (canceled = 0 OR canceled IS NULL)", (loan_id,))
+        res['returns'] = [r['id'] for r in c.fetchall()]
+        
+        # Find CheckSessions linked to this loan (checkout)
+        c.execute("SELECT id FROM check_sessions WHERE loan_id = ? AND (canceled = 0 OR canceled IS NULL)", (loan_id,))
+        res['check_sessions'] = [r['id'] for r in c.fetchall()]
+        
+    # Issues are linked to CheckSessions
+    if res['check_sessions']:
+        placeholders = ','.join(['?']*len(res['check_sessions']))
+        c.execute(f"SELECT id FROM issues WHERE check_session_id IN ({placeholders}) AND status = 'open'", tuple(res['check_sessions']))
+        res['issues'] = [r['id'] for r in c.fetchall()]
+        
+    conn.close()
+    return res
+
+def migrate_phase4():
+    """Add new columns for Phase 4 if they don't exist."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    tables = ['loans', 'check_sessions', 'issues', 'returns']
+    columns = [
+        ('canceled', 'INTEGER DEFAULT 0'),
+        ('canceled_at', 'TEXT'),
+        ('canceled_by', 'TEXT'),
+        ('cancel_reason', 'TEXT')
+    ]
+    
+    for tbl in tables:
+        # Check columns
+        c.execute(f"PRAGMA table_info({tbl})")
+        existing_cols = [row[1] for row in c.fetchall()]
+        
+        for col_name, col_def in columns:
+            if col_name not in existing_cols:
+                try:
+                    print(f"Migrating {tbl}: Adding {col_name}")
+                    c.execute(f"ALTER TABLE {tbl} ADD COLUMN {col_name} {col_def}")
+                except Exception as e:
+                    print(f"Error altering {tbl}: {e}")
+                    
+    conn.commit()
+    conn.close()

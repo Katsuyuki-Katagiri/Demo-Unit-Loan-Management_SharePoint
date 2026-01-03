@@ -1,6 +1,7 @@
 from src.database import (
-    get_template_lines, get_unit_overrides
+    get_template_lines, get_unit_overrides, DB_PATH
 )
+import sqlite3
 
 def get_synthesized_checklist(device_type_id: int, device_unit_id: int):
     """
@@ -152,7 +153,122 @@ def process_loan(
 
 # --- Phase 3: Return Logic ---
 
-from src.database import create_return, get_active_loan
+        update_unit_status(device_unit_id, 'in_stock')
+        return "in_stock"
+
+# --- Phase 4 Logic ---
+
+from src.database import (
+    resolve_issue, cancel_record, get_related_records,
+    get_open_issues, get_active_loan, update_unit_status,
+    create_return, create_check_session, create_check_line
+)
+
+def recalculate_unit_status(device_unit_id: int):
+    """
+    Recalculate and update the status of a unit based on current Loans and Issues.
+    Priority:
+    1. Open Issues (not canceled) -> 'needs_attention'
+    2. Active Loan (not canceled) -> 'loaned'
+    3. Else -> 'in_stock'
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    # Check Issues
+    issues = get_open_issues(device_unit_id)
+    if issues:
+        new_status = 'needs_attention'
+    else:
+        # Check Loan
+        loan = get_active_loan(device_unit_id)
+        if loan:
+            new_status = 'loaned'
+        else:
+            new_status = 'in_stock'
+            
+    conn.close()
+    update_unit_status(device_unit_id, new_status)
+    return new_status
+
+def perform_issue_resolution(device_unit_id: int, issue_id: int, user_name: str):
+    resolve_issue(issue_id, user_name)
+    return recalculate_unit_status(device_unit_id)
+
+def perform_cancellation(target_type: str, target_id: int, user_name: str, reason: str, device_unit_id: int):
+    """
+    Cancel a record and its dependents.
+    target_type: 'loan', 'return' (, 'issue' - maybe)
+    """
+    if target_type == 'loan':
+        # Cancel Loan
+        cancel_record('loans', target_id, user_name, reason)
+        
+        # Cascade: Find related CheckSessions (checkout)
+        related = get_related_records(loan_id=target_id)
+        
+        for sess_id in related['check_sessions']:
+            cancel_record('check_sessions', sess_id, user_name, "Cascade from Loan Cancel")
+            
+        for iss_id in related['issues']:
+            cancel_record('issues', iss_id, user_name, "Cascade from Loan Cancel")
+            
+        # If there were linked returns, we should probably cancel them too?
+        # A loan shouldn't be cancelled if it was returned? Or strictly cancel everything?
+        # User requirement: "All cancellation OK".
+        for ret_id in related['returns']:
+            cancel_record('returns', ret_id, user_name, "Cascade from Loan Cancel")
+            
+    elif target_type == 'return':
+        # Cancel Return
+        cancel_record('returns', target_id, user_name, reason)
+        
+        # We need to find the Loan ID to RE-OPEN it
+        # But get_related_records doesn't give us the loan ID from return ID easily unless we query.
+        # Let's assume the caller passes the loan_id or we fetch it.
+        # Fetch return to get loan_id
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT loan_id FROM returns WHERE id = ?", (target_id,))
+        ret_row = c.fetchone()
+        conn.close()
+        
+        if ret_row:
+            loan_id = ret_row['loan_id']
+            # Re-open Loan
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute("UPDATE loans SET status = 'open' WHERE id = ?", (loan_id,))
+            conn.commit()
+            conn.close()
+            
+            # Cascade: Cancel Return CheckSession and its Issues
+            # We need to find the check session linked to this return.
+            # CheckSession has no return_id column directly, but session_type='return' and loan_id=?
+            # Wait, `check_sessions` has `loan_id`. If multiple returns for same loan (re-return?), creates ambiguity.
+            # But typically 1 loan = 1 return.
+            # However, safer to search check_session by timestamp proximity or assume strict 1:1 if possible.
+            # For this phase, let's look for session_type='return' and loan_id=loan_id AND not canceled.
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute("SELECT id FROM check_sessions WHERE loan_id = ? AND session_type = 'return' AND (canceled=0 OR canceled IS NULL)", (loan_id,))
+            sessions = c.fetchall()
+            conn.close()
+            
+            for (sess_id,) in sessions:
+                cancel_record('check_sessions', sess_id, user_name, "Cascade from Return Cancel")
+                # Cancel issues linked to this session
+                conn = sqlite3.connect(DB_PATH)
+                c = conn.cursor()
+                c.execute("SELECT id FROM issues WHERE check_session_id = ? AND (canceled=0 OR canceled IS NULL)", (sess_id,))
+                issues = c.fetchall()
+                conn.close()
+                for (iss_id,) in issues:
+                    cancel_record('issues', iss_id, user_name, "Cascade from Return Cancel")
+
+    recalculate_unit_status(device_unit_id)
+
 
 def process_return(
     device_unit_id: int,
