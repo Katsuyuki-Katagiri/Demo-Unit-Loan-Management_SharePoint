@@ -40,8 +40,17 @@ def main():
         
         # Navigation Menu
         page_options = ["Home"]
+        
+        # Everyone can see Analytics? Or Admin only?
+        # User requirement: "Group management -> Admin/Authorized".
+        # Let's show Analytics to everyone, Settings to Admin?
+        # For Demo, maybe open to all or Admin.
+        # Let's say Analytics is for everyone.
+        page_options.append("Analytics")
+        
         if st.session_state.get('user_role') == 'admin':
             page_options.append("Master Management")
+            page_options.append("Settings")
             
         selected_page = st.radio("Menu", page_options)
         
@@ -53,8 +62,14 @@ def main():
     # Routing
     if selected_page == "Home":
         render_home_view()
+    elif selected_page == "Analytics":
+        from src.views.analytics import render_analytics_view
+        render_analytics_view()
     elif selected_page == "Master Management":
         render_master_view()
+    elif selected_page == "Settings":
+        from src.views.settings import render_settings_view
+        render_settings_view()
 
 if __name__ == "__main__":
     main()

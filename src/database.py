@@ -105,10 +105,13 @@ def init_db():
             checkout_date TEXT NOT NULL,
             destination TEXT NOT NULL,
             purpose TEXT NOT NULL,
-            checker_user_id INTEGER, -- Optional: ID of user who performed checkout
-            status TEXT DEFAULT 'open', -- open, closed
-            canceled INTEGER DEFAULT 0, -- 0: false, 1: true
+            checker_user_id INTEGER,
+            status TEXT DEFAULT 'open',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            canceled INTEGER DEFAULT 0,
+            canceled_at TEXT,
+            canceled_by TEXT,
+            cancel_reason TEXT,
             FOREIGN KEY (device_unit_id) REFERENCES device_units (id)
         )
     ''')
@@ -117,13 +120,16 @@ def init_db():
     c.execute('''
         CREATE TABLE IF NOT EXISTS check_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_type TEXT NOT NULL, -- 'checkout', 'return'
+            session_type TEXT NOT NULL,
             loan_id INTEGER,
             device_unit_id INTEGER NOT NULL,
-            performed_by TEXT, -- User name or ID
+            performed_by TEXT,
             performed_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            device_photo_dir TEXT, -- Path to directory containing session photos
+            device_photo_dir TEXT,
             canceled INTEGER DEFAULT 0,
+            canceled_at TEXT,
+            canceled_by TEXT,
+            cancel_reason TEXT,
             FOREIGN KEY (loan_id) REFERENCES loans (id),
             FOREIGN KEY (device_unit_id) REFERENCES device_units (id)
         )
@@ -151,12 +157,16 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             device_unit_id INTEGER NOT NULL,
             check_session_id INTEGER,
-            status TEXT DEFAULT 'open', -- open, closed
-            summary TEXT, -- e.g. "Missing power cord"
+            status TEXT DEFAULT 'open',
+            summary TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             created_by TEXT,
             resolved_at TEXT,
             resolved_by TEXT,
+            canceled INTEGER DEFAULT 0,
+            canceled_at TEXT,
+            canceled_by TEXT,
+            cancel_reason TEXT,
             FOREIGN KEY (device_unit_id) REFERENCES device_units (id),
             FOREIGN KEY (check_session_id) REFERENCES check_sessions (id)
         )
@@ -171,7 +181,45 @@ def init_db():
             return_date TEXT NOT NULL,
             checker_user_id INTEGER,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            canceled INTEGER DEFAULT 0,
+            canceled_at TEXT,
+            canceled_by TEXT,
+            cancel_reason TEXT,
             FOREIGN KEY (loan_id) REFERENCES loans (id)
+        )
+    ''')
+    
+    # Phase 5 Tables
+    # Notification Groups (Category <-> Users)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS notification_groups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            FOREIGN KEY (category_id) REFERENCES categories (id),
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            UNIQUE(category_id, user_id)
+        )
+    ''')
+
+    # Notification Logs
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS notification_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL, -- 'issue_created' etc.
+            related_id INTEGER, -- e.g. issue_id
+            recipient TEXT NOT NULL, -- Email or User Name
+            status TEXT NOT NULL, -- 'sent', 'failed', 'logged_only'
+            error_message TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # System Settings (Key-Value)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS system_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
         )
     ''')
     
@@ -603,3 +651,115 @@ def migrate_phase4():
                     
     conn.commit()
     conn.close()
+
+def get_loan_history(device_unit_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("""
+        SELECT * FROM loans 
+        WHERE device_unit_id = ?
+        ORDER BY id DESC
+    """, (device_unit_id,))
+    res = c.fetchall()
+    conn.close()
+    return res
+
+# -- Phase 5 Operations --
+
+def get_all_users():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT id, name, email FROM users ORDER BY name")
+    res = c.fetchall()
+    conn.close()
+    return res
+
+def add_notification_member(category_id: int, user_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("INSERT INTO notification_groups (category_id, user_id) VALUES (?, ?)", (category_id, user_id))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        pass # Already exists
+    conn.close()
+
+def remove_notification_member(category_id: int, user_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM notification_groups WHERE category_id = ? AND user_id = ?", (category_id, user_id))
+    conn.commit()
+    conn.close()
+
+def get_notification_members(category_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("""
+        SELECT u.id, u.name, u.email 
+        FROM notification_groups ng
+        JOIN users u ON ng.user_id = u.id
+        WHERE ng.category_id = ?
+    """, (category_id,))
+    res = c.fetchall()
+    conn.close()
+    return res
+
+def log_notification(event_type: str, related_id: int, recipient: str, status: str, error_message: str = None):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO notification_logs (event_type, related_id, recipient, status, error_message)
+        VALUES (?, ?, ?, ?, ?)
+    """, (event_type, related_id, recipient, status, error_message))
+    conn.commit()
+    conn.close()
+
+def get_notification_logs(limit: int = 50):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM notification_logs ORDER BY id DESC LIMIT ?", (limit,))
+    res = c.fetchall()
+    conn.close()
+    return res
+
+def save_system_setting(key: str, value: str):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)", (key, value))
+    conn.commit()
+    conn.close()
+
+def get_system_setting(key: str):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT value FROM system_settings WHERE key = ?", (key,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+def migrate_phase5():
+    """Create Phase 5 tables if they don't exist."""
+    print("Migrating Phase 5...")
+    init_db() # init_db now includes Phase 5 tables, so running it checks and creates them safely
+    print("Phase 5 Migration Complete (via init_db check).")
+
+def get_unit_status_counts():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT status, COUNT(*) FROM device_units GROUP BY status")
+    rows = c.fetchall()
+    conn.close()
+    return dict(rows)
+
+def get_unit_status_counts():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT status, COUNT(*) FROM device_units GROUP BY status")
+    rows = c.fetchall()
+    conn.close()
+    return dict(rows)
+

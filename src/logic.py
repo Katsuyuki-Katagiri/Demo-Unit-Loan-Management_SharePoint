@@ -141,7 +141,8 @@ def process_loan(
         if is_ng:
             # Create Issue
             summary = f"NG Item: {res['name']} - {res.get('ng_reason')}"
-            create_issue(device_unit_id, session_id, summary, user_name)
+            issue_id = create_issue(device_unit_id, session_id, summary, user_name)
+            trigger_issue_notification(device_unit_id, issue_id, summary)
             
     # 5. Update Status
     if has_ng:
@@ -331,7 +332,8 @@ def process_return(
         if is_ng:
             # Create Issue
             summary = f"[Return] NG Item: {res['name']} - {res.get('ng_reason')}"
-            create_issue(device_unit_id, session_id, summary, user_name)
+            issue_id = create_issue(device_unit_id, session_id, summary, user_name)
+            trigger_issue_notification(device_unit_id, issue_id, summary)
             
     # 5. Update Status (Recalculate)
     # Check if ANY open issues exist (from this return OR previous)
@@ -342,3 +344,134 @@ def process_return(
     else:
         update_unit_status(device_unit_id, 'in_stock')
         return "in_stock"
+
+# --- Phase 5 Logic ---
+
+from src.database import (
+    get_notification_members, get_system_setting, log_notification,
+    get_device_unit_by_id, get_device_type_by_id
+)
+import smtplib
+import json
+from email.mime.text import MIMEText
+
+def trigger_issue_notification(device_unit_id: int, issue_id: int, summary: str):
+    """
+    Trigger notification for a new issue.
+    1. Identify Category -> Group Members
+    2. Check SMTP Settings
+    3. Log and Send (if enabled)
+    """
+    # 1. Get Unit -> Type -> Category
+    unit = get_device_unit_by_id(device_unit_id)
+    type_info = get_device_type_by_id(unit['device_type_id'])
+    category_id = type_info['category_id']
+    
+    members = get_notification_members(category_id)
+    if not members:
+        return # No one to notify
+        
+    # 2. SMTP Settings
+    smtp_config_json = get_system_setting('smtp_config')
+    smtp_enabled = False
+    smtp_config = {}
+    if smtp_config_json:
+        try:
+            smtp_config = json.loads(smtp_config_json)
+            smtp_enabled = smtp_config.get('enabled', False)
+        except:
+            pass
+            
+    # 3. Process Members
+    for m in members:
+        recipient_email = m['email']
+        recipient_name = m['name']
+        
+        # Always Log
+        log_status = 'logged_only'
+        error_msg = None
+        
+        if smtp_enabled and recipient_email:
+            try:
+                # Send Email
+                msg = MIMEText(f"""
+                Hello {recipient_name},
+                
+                An issue has been reported for {type_info['name']} (Lot: {unit['lot_number']}).
+                
+                Issue: {summary}
+                
+                Please check the system for details.
+                """)
+                msg['Subject'] = f"[Alert] Issue Reported: {type_info['name']}"
+                msg['From'] = smtp_config.get('from_addr', 'noreply@example.com')
+                msg['To'] = recipient_email
+                
+                with smtplib.SMTP(smtp_config.get('host', 'localhost'), int(smtp_config.get('port', 25))) as server:
+                    if smtp_config.get('user') and smtp_config.get('password'):
+                         # Optional: StartTLS if port 587? For now simple implementation.
+                         if int(smtp_config.get('port', 25)) == 587:
+                             server.starttls()
+                         server.login(smtp_config.get('user'), smtp_config.get('password'))
+                    server.send_message(msg)
+                
+                log_status = 'sent'
+            except Exception as e:
+                log_status = 'failed'
+                error_msg = str(e)
+                
+        log_notification('issue_created', issue_id, f"{recipient_name} ({recipient_email})", log_status, error_msg)
+
+
+def calculate_utilization(device_unit_id: int, start_date_str: str, end_date_str: str):
+    """
+    Calculate utilization rate (%) for a specific period.
+    Formula: (Occupied Days / Total Days) * 100
+    Occupied: Loan periods overlapping the range. Same day loan = 1 day.
+    """
+    start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
+    end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    
+    total_days = (end_date - start_date).days + 1
+    if total_days <= 0:
+        return 0.0
+        
+    occupied_days = 0
+    
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("""
+        SELECT l.checkout_date, r.return_date, l.status, l.canceled 
+        FROM loans l
+        LEFT JOIN returns r ON l.id = r.loan_id AND (r.canceled = 0 OR r.canceled IS NULL)
+        WHERE l.device_unit_id = ? AND (l.canceled = 0 OR l.canceled IS NULL)
+    """, (device_unit_id,))
+    loans = c.fetchall()
+    conn.close()
+    
+    occupied_dates = set()
+    
+    for l in loans:
+        l_start = datetime.datetime.strptime(l['checkout_date'], '%Y-%m-%d').date()
+        
+        if l['return_date']:
+             l_end = datetime.datetime.strptime(l['return_date'], '%Y-%m-%d').date()
+        else:
+             # Open loan: up to period end
+             l_end = end_date
+             
+        # Clip to Period
+        eff_start = max(start_date, l_start)
+        eff_end = min(end_date, l_end)
+        
+        if eff_start <= eff_end:
+            # Inclusive range
+            curr = eff_start
+            while curr <= eff_end:
+                occupied_dates.add(curr)
+                curr += datetime.timedelta(days=1)
+                
+    occupied_count = len(occupied_dates)
+    return round((occupied_count / total_days) * 100, 1)
+
