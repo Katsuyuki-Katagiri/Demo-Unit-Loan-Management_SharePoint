@@ -2,7 +2,8 @@ import streamlit as st
 import datetime
 import os
 from src.database import (
-    get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR, get_active_loan, get_loan_by_id
+    get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR, get_active_loan, get_loan_by_id,
+    get_user_by_id, get_check_session_by_loan_id
 )
 from src.logic import get_synthesized_checklist, process_return
 
@@ -27,7 +28,7 @@ def render_return_view(unit_id: int):
 
     type_info = get_device_type_by_id(unit['device_type_id'])
     
-    st.title("機材返却登録 (Return)")
+    st.title("機材返却登録")
     st.markdown(f"**{type_info['name']}** (Lot: {unit['lot_number']})")
     
     # Back Button
@@ -40,12 +41,23 @@ def render_return_view(unit_id: int):
     # --- Display Loan Info ---
     st.subheader("貸出情報")
     with st.container(border=True):
-        c1, c2, c3 = st.columns(3)
+        # Get Carrier Name
+        carrier_name = "Unknown"
+        if active_loan_info['checker_user_id']:
+            u_obj = get_user_by_id(active_loan_info['checker_user_id'])
+            if u_obj: carrier_name = u_obj['name']
+        else:
+            sess = get_check_session_by_loan_id(active_loan_info['id'])
+            if sess: carrier_name = sess['performed_by']
+
+        c1, c2, c3, c4 = st.columns(4)
         with c1:
             st.write(f"持出日: **{active_loan_info['checkout_date']}**")
         with c2:
-            st.write(f"貸出先: **{active_loan_info['destination']}**")
+            st.write(f"持出者: **{carrier_name}**")
         with c3:
+            st.write(f"貸出先: **{active_loan_info['destination']}**")
+        with c4:
             st.write(f"目的: **{active_loan_info['purpose']}**")
 
     # --- input Fields ---

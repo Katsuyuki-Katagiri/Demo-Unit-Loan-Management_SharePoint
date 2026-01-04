@@ -3,7 +3,7 @@ import os
 from src.database import (
     get_all_categories, get_device_types, get_device_units, 
     get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR,
-    get_active_loan
+    get_active_loan, get_user_by_id, get_check_session_by_loan_id
 )
 
 from src.logic import get_synthesized_checklist, get_image_base64
@@ -69,7 +69,27 @@ def render_home_view():
         c1, c2 = st.columns([3, 1])
         with c1:
             st.title(f"{type_info['name']} (Lot: {unit['lot_number']})")
-            st.info(f"保管場所: {unit['location']} | Status: {unit['status']}")
+            # Determine display info
+            location_disp = f"保管場所: {unit['location']}"
+            loaner_disp = ""
+            
+            if unit['status'] == 'loaned':
+                active_loan = get_active_loan(unit_id)
+                if active_loan:
+                    location_disp = f"保管場所: {active_loan['destination']} (貸出先)"
+                    # Get Loaner Name
+                    l_Name = "Unknown"
+                    if active_loan['checker_user_id']:
+                        u_obj = get_user_by_id(active_loan['checker_user_id'])
+                        if u_obj: l_Name = u_obj['name']
+                    else:
+                        # Fallback
+                        sess = get_check_session_by_loan_id(active_loan['id'])
+                        if sess: l_Name = sess['performed_by']
+                    
+                    loaner_disp = f" | 持出者: {l_Name}"
+
+            st.info(f"{location_disp}{loaner_disp} | Status: {unit['status']}")
             
             # --- Issues Section ---
             from src.database import get_open_issues
@@ -251,7 +271,16 @@ def render_home_view():
                         # Get active loan info
                         loan_info = get_active_loan(units[0]['id'])
                         if loan_info:
-                            label += f" @ {loan_info['destination']} ({loan_info['checkout_date']})"
+                            # Get Carrier Name
+                            carrier_name = "Unknown"
+                            if loan_info['checker_user_id']:
+                                u_obj = get_user_by_id(loan_info['checker_user_id'])
+                                if u_obj: carrier_name = u_obj['name']
+                            else:
+                                sess = get_check_session_by_loan_id(loan_info['id'])
+                                if sess: carrier_name = sess['performed_by']
+
+                            label += f" @ {loan_info['destination']} (持出者: {carrier_name} / {loan_info['checkout_date']})"
                     elif status == 'needs_attention':
                         label += " 【⚠️ 要対応】"
                 

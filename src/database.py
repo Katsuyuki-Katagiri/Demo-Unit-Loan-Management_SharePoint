@@ -645,6 +645,15 @@ def get_active_loan(device_unit_id: int):
     conn.close()
     return res
 
+def get_check_session_by_loan_id(loan_id: int, session_type: str = 'checkout'):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM check_sessions WHERE loan_id = ? AND session_type = ? LIMIT 1", (loan_id, session_type))
+    res = c.fetchone()
+    conn.close()
+    return res
+
 def get_loan_by_id(loan_id: int):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -768,6 +777,15 @@ def get_all_users():
     c = conn.cursor()
     c.execute("SELECT id, name, email FROM users ORDER BY name")
     res = c.fetchall()
+    conn.close()
+    return res
+
+def get_user_by_id(user_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT id, name, email FROM users WHERE id = ?", (user_id,))
+    res = c.fetchone()
     conn.close()
     return res
 
