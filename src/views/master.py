@@ -84,7 +84,6 @@ def render_master_view():
                         unit = units[0] 
                         
                         # Display current info
-                        st.success(f"登録済み: Lot {unit['lot_number']}")
                         st.dataframe(
                             [{"ロット": u['lot_number'], "保管場所": u['location'], "製造年月日": u['mfg_date'], "点検実施日": u['last_check_date'], "次回点検予定日": u['next_check_date']} for u in units],
                             use_container_width=True
@@ -107,8 +106,8 @@ def render_master_view():
                                             return None
                                     return None
 
-                                last_check = c3.date_input("点検実施日", value=parse_date(unit['last_check_date']))
-                                next_check = c4.date_input("次回点検予定日", value=parse_date(unit['next_check_date']))
+                                last_check = c3.date_input("点検実施日", value=parse_date(unit['last_check_date']), format="YYYY/MM/DD")
+                                next_check = c4.date_input("次回点検予定日", value=parse_date(unit['next_check_date']), format="YYYY/MM/DD")
                                 
                                 if st.form_submit_button("更新"):
                                     l_str = last_check.strftime('%Y-%m-%d') if last_check else ""
@@ -131,8 +130,8 @@ def render_master_view():
                             mfg = st.text_input("製造年月日")
                             
                             c3, c4 = st.columns(2)
-                            last_check = c3.date_input("点検実施日", value=None)
-                            next_check = c4.date_input("次回点検予定日", value=None)
+                            last_check = c3.date_input("点検実施日", value=None, format="YYYY/MM/DD")
+                            next_check = c4.date_input("次回点検予定日", value=None, format="YYYY/MM/DD")
 
                             if st.form_submit_button("登録"):
                                 l_str = last_check.strftime('%Y-%m-%d') if last_check else ""
