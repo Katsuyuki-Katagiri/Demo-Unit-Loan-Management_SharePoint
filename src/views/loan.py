@@ -4,7 +4,7 @@ import os
 from src.database import (
     get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR
 )
-from src.logic import get_synthesized_checklist, process_loan
+from src.logic import get_synthesized_checklist, process_loan, get_image_base64
 
 def render_loan_view(unit_id: int):
     # Retrieve Unit & Type Info
@@ -83,10 +83,21 @@ def render_loan_view(unit_id: int):
                 st.caption(f"必要数: {item['required_qty']}")
                 
                 # Show image if exists
+                # Show image if exists
                 if item['photo_path']:
                     full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
                     if os.path.exists(full_path):
-                        st.image(full_path, width=100)
+                        # Use same logic as Home View
+                        b64 = get_image_base64(full_path)
+                        if b64:
+                            st.markdown(f'<img src="data:image/png;base64,{b64}" style="width: 120px; height: 120px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;">', unsafe_allow_html=True)
+                        else:
+                            st.caption("Load Error")
+                    else:
+                        # Placeholder
+                        st.markdown('<div style="width: 120px; height: 120px; background-color: #f0f0f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #888;">No Image</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown('<div style="width: 120px; height: 120px; background-color: #f0f0f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #888;">No Image</div>', unsafe_allow_html=True)
 
             with r2:
                 # Result Toggle

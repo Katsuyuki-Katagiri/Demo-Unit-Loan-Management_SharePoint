@@ -2,6 +2,22 @@ from src.database import (
     get_template_lines, get_unit_overrides, DB_PATH
 )
 import sqlite3
+import sqlite3
+from PIL import Image, ImageOps # type: ignore
+import base64
+from io import BytesIO
+
+def get_image_base64(image_path):
+    """Convert image to base64 string for HTML embedding, max 500px."""
+    try:
+        img = Image.open(image_path)
+        img.thumbnail((500, 500), Image.Resampling.LANCZOS)
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode()
+    except Exception as e:
+        print(f"Error encoding image: {e}")
+        return None
 
 def get_synthesized_checklist(device_type_id: int, device_unit_id: int):
     """

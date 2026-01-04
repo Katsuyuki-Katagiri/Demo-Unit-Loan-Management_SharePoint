@@ -4,7 +4,7 @@ from src.database import (
     get_all_categories, get_device_types, get_device_units, 
     get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR
 )
-from src.logic import get_synthesized_checklist
+from src.logic import get_synthesized_checklist, get_image_base64
 
 def render_home_view():
     # Navigation State Management
@@ -14,15 +14,32 @@ def render_home_view():
     # Level 3: Unit Detail (in session_state['selected_unit_id'])
     
     # Back button helpers
+    # Back button helpers
     if 'selected_unit_id' in st.session_state and st.session_state['selected_unit_id']:
-        if st.button("← ロット一覧に戻る"):
-            st.session_state['selected_unit_id'] = None
-            st.rerun()
+        c_b1, c_b2 = st.columns([2, 8])
+        with c_b1:
+            if st.button("← 機種一覧に戻る"): 
+                st.session_state['selected_unit_id'] = None
+                st.session_state['selected_type_id'] = None # Also clear type to go back to list
+                st.rerun()
+        with c_b2:
+            if st.button("🏠 ホームに戻る", key="home_btn_3"):
+                st.session_state['selected_unit_id'] = None
+                st.session_state['selected_type_id'] = None
+                st.session_state['selected_category_id'] = None
+                st.rerun()
             
     elif 'selected_type_id' in st.session_state and st.session_state['selected_type_id']:
-        if st.button("← 機種一覧に戻る"):
-            st.session_state['selected_type_id'] = None
-            st.rerun()
+        c_b1, c_b2 = st.columns([2, 8])
+        with c_b1:
+            if st.button("← 機種一覧に戻る"):
+                st.session_state['selected_type_id'] = None
+                st.rerun()
+        with c_b2:
+            if st.button("🏠 ホームに戻る", key="home_btn_2"):
+                st.session_state['selected_type_id'] = None
+                st.session_state['selected_category_id'] = None
+                st.rerun()
             
     elif 'selected_category_id' in st.session_state and st.session_state['selected_category_id']:
         if st.button("← ホームに戻る"):
@@ -130,25 +147,60 @@ def render_home_view():
         if not checklist:
             st.warning("構成品が定義されていません")
         else:
+            html_content = ""
             for item in checklist:
-                with st.container(border=True):
-                   c1, c2 = st.columns([1, 4])
-                   with c1:
-                       if item['photo_path']:
-                           full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
-                           if os.path.exists(full_path):
-                               st.image(full_path, use_container_width=True)
-                           else:
-                               st.caption("No Image")
-                       else:
-                           st.caption("No Image")
-                    
-                   with c2:
-                       name_display = item['name']
-                       if item['is_override']:
-                           name_display += " (個体差分)"
-                       st.markdown(f"#### {name_display}")
-                       st.write(f"必要数: **{item['required_qty']}**")
+                img_tag = ""
+                if item['photo_path']:
+                    full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
+                    if os.path.exists(full_path):
+                        b64_str = get_image_base64(full_path)
+                        if b64_str:
+                            img_tag = f'<img src="data:image/png;base64,{b64_str}" style="max-width: 100%; max-height: 100%; object-fit: contain;">'
+                        else:
+                            img_tag = '<div style="color: #888; font-size: 0.8em;">Image Error</div>'
+                    else:
+                        img_tag = '<div style="color: #888; font-size: 0.8em;">No Image</div>'
+                else:
+                    img_tag = '<div style="color: #888; font-size: 0.8em;">No Image</div>'
+
+                name_display = item['name']
+                if item['is_override']:
+                    name_display += " <span style='color: orange; font-size: 0.8em;'>(個体差分)</span>"
+                
+                # Card HTML
+                html_content += f"""
+                <div style="
+                    display: flex; 
+                    flex-direction: row; 
+                    align-items: center; 
+                    border: 1px solid rgba(128, 128, 128, 0.2); 
+                    border-radius: 8px; 
+                    padding: 10px; 
+                    margin-bottom: 10px; 
+                    height: 120px; 
+                    background-color: transparent;
+                ">
+                    <div style="
+                        width: 120px; 
+                        height: 100px; 
+                        flex-shrink: 0; 
+                        display: flex; 
+                        align-items: center; 
+                        justify-content: center;
+                        margin-right: 15px;
+                        background-color: rgba(128, 128, 128, 0.05);
+                        border-radius: 4px;
+                    ">
+                        {img_tag}
+                    </div>
+                    <div style="flex-grow: 1; overflow: hidden;">
+                        <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 5px;">{name_display}</div>
+                        <div style="font-size: 0.9em;">必要数: <strong>{item['required_qty']}</strong></div>
+                    </div>
+                </div>
+                """
+            
+            st.markdown(html_content, unsafe_allow_html=True)
 
     # --- Level 2: Device Units List ---
     elif st.session_state.get('selected_type_id'):
@@ -187,6 +239,10 @@ def render_home_view():
             for t in types:
                 if st.button(t['name'], key=f"type_{t['id']}", use_container_width=True):
                     st.session_state['selected_type_id'] = t['id']
+                    # Auto-select unit if exists (Skip Level 2)
+                    units = get_device_units(t['id'])
+                    if units:
+                        st.session_state['selected_unit_id'] = units[0]['id']
                     st.rerun()
 
     # --- Level 0: Categories (Home) ---
