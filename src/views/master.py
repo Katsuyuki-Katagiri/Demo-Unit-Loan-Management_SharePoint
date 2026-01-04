@@ -110,46 +110,7 @@ def render_master_view():
                                 else:
                                     st.error("登録失敗 (重複など)")
 
-                st.divider()
 
-                # --- Section 3: Overrides ---
-                st.markdown("#### ③ 個体差分 (Overrides)")
-                st.caption("特定のロットだけ構成品が異なる場合（欠品や追加）に設定します。")
-                
-                # Select Unit
-                units_ov = get_device_units(selected_type_id)
-                if not units_ov:
-                    st.warning("先に「ロット一覧」でロットを登録してください。")
-                else:
-                    unit_opts = {f"Lot: {u['lot_number']}": u['id'] for u in units_ov}
-                    sel_unit_key_ov = st.selectbox("対象ロットを選択", options=list(unit_opts.keys()))
-                    sel_unit_id_ov = unit_opts[sel_unit_key_ov]
-                    
-                    # Show Overrides
-                    overrides = get_unit_overrides(sel_unit_id_ov)
-                    if overrides:
-                        st.markdown("**設定済みの差分:**")
-                        for ov in overrides:
-                            st.write(f"- {ov['item_name']}: {ov['action']} (Qty: {ov['qty']})")
-                    else:
-                        st.info("差分設定はありません（標準構成と同じ）")
-                    
-                    with st.expander("差分設定を追加"):
-                        with st.form("add_ov_quick"):
-                            all_items_ov = get_all_items()
-                            item_opts_ov = {f"{i['name']}": i['id'] for i in all_items_ov}
-                            sel_item_key_ov = st.selectbox("構成品", options=list(item_opts_ov.keys()))
-                            
-                            c_ov1, c_ov2 = st.columns(2)
-                            action = c_ov1.radio("アクション", ["add (追加)", "remove (除外)", "qty (数量変更)"])
-                            qty_ov = c_ov2.number_input("数量", min_value=0, value=1)
-                            
-                            if st.form_submit_button("設定"):
-                                # Map display action to db action
-                                act_map = {"add (追加)": "add", "remove (除外)": "remove", "qty (数量変更)": "qty"}
-                                add_unit_override(sel_unit_id_ov, item_opts_ov[sel_item_key_ov], act_map[action], qty_ov)
-                                st.success("設定しました")
-                                st.rerun()
 
     # --- Tab 2: Item Master ---
     with main_tab2:
