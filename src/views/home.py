@@ -25,7 +25,7 @@ def render_home_view():
             st.rerun()
             
     elif 'selected_category_id' in st.session_state and st.session_state['selected_category_id']:
-        if st.button("← 大分類に戻る"):
+        if st.button("← ホームに戻る"):
             st.session_state['selected_category_id'] = None
             st.rerun()
 
@@ -213,7 +213,7 @@ def render_home_view():
             
         st.divider()
         
-        st.markdown("### クラス選択")
+        st.markdown("### 装置選択")
         categories = get_all_categories()
         
         # Grid layout
