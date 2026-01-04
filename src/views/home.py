@@ -2,8 +2,10 @@ import streamlit as st
 import os
 from src.database import (
     get_all_categories, get_device_types, get_device_units, 
-    get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR
+    get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR,
+    get_active_loan
 )
+
 from src.logic import get_synthesized_checklist, get_image_base64
 
 def render_home_view():
@@ -118,7 +120,7 @@ def render_home_view():
             st.write("") # spacer
             st.write("")
             # Check conditions for Loan/Return
-            from src.database import get_active_loan
+
             # issues fetched above
             active_loan = get_active_loan(unit_id)
             
@@ -237,10 +239,25 @@ def render_home_view():
             st.info("この分類に登録されている機種はありません")
         else:
             for t in types:
-                if st.button(t['name'], key=f"type_{t['id']}", use_container_width=True):
+                # Determine Label with Status
+                units = get_device_units(t['id'])
+                label = t['name']
+                if units:
+                    status = units[0]['status']
+                    if status == 'in_stock':
+                        label += " 【✅ 在庫あり】"
+                    elif status == 'loaned':
+                        label += " 【🔴 貸出中】"
+                        # Get active loan info
+                        loan_info = get_active_loan(units[0]['id'])
+                        if loan_info:
+                            label += f" @ {loan_info['destination']} ({loan_info['checkout_date']})"
+                    elif status == 'needs_attention':
+                        label += " 【⚠️ 要対応】"
+                
+                if st.button(label, key=f"type_{t['id']}", use_container_width=True):
                     st.session_state['selected_type_id'] = t['id']
                     # Auto-select unit if exists (Skip Level 2)
-                    units = get_device_units(t['id'])
                     if units:
                         st.session_state['selected_unit_id'] = units[0]['id']
                     st.rerun()
