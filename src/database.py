@@ -693,6 +693,36 @@ def get_check_session_by_loan_id(loan_id: int, session_type: str = 'checkout'):
     conn.close()
     return res
 
+def get_all_check_sessions_for_loan(loan_id: int):
+    """Get ALL check sessions related to a loan (checkout, return, etc.)."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("""
+        SELECT * FROM check_sessions 
+        WHERE loan_id = ? 
+        ORDER BY id ASC
+    """, (loan_id,))
+    res = c.fetchall()
+    conn.close()
+    return res
+
+def get_check_session_lines(check_session_id: int):
+    """Get check lines with item details for a session."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("""
+        SELECT cl.*, i.name as item_name, i.photo_path
+        FROM check_lines cl
+        JOIN items i ON cl.item_id = i.id
+        WHERE cl.check_session_id = ?
+        ORDER BY cl.id ASC
+    """, (check_session_id,))
+    res = c.fetchall()
+    conn.close()
+    return res
+
 def get_loan_by_id(loan_id: int):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row

@@ -109,7 +109,7 @@ def render_home_view():
                             st.rerun()
             
             # --- History Section ---
-            with st.expander("貸出履歴 / 取消"):
+            with st.expander("貸出返却履歴"):
                 from src.database import get_loan_history
                 history = get_loan_history(unit_id)
                 if not history:
@@ -119,21 +119,50 @@ def render_home_view():
                         status_icon = "🟢" if l['status'] == 'open' else "⚫"
                         if l['canceled']:
                             status_icon = "❌ (Canceled)"
-                            
+                        
+                        # Determine Carrier Name
+                        carrier_name = "Unknown"
+                        if l['checker_user_id']:
+                            u_obj = get_user_by_id(l['checker_user_id'])
+                            if u_obj: carrier_name = u_obj['name']
+                        else:
+                            # Fallback to check session
+                            sess = get_check_session_by_loan_id(l['id'])
+                            if sess: carrier_name = sess['performed_by']
+
                         st.markdown(f"**{l['checkout_date']}** - {l['destination']} ({l['purpose']})")
-                        st.caption(f"Status: {l['status']} | {status_icon}")
+                        st.caption(f"Status: {l['status']} | 持出者: {carrier_name} | {status_icon}")
                         
                         # Cancel Button (Only if not already canceled)
                         if not l['canceled']:
-                            # If Open, allow cancellation
-                            # If Closed (returned), usually allow cancelling the RETURN, not the LOAN directly?
-                            # Requirement: "All cancellation OK"
-                            # If status is closed, it means it was returned. Cancelling Loan would orphan the return?
-                            # Logic perform_cancellation('loan') cascades to Returns too. So it's safe.
                             if st.button(f"取消 (Cancel Loan #{l['id']})", key=f"cancel_loan_{l['id']}"):
                                 perform_cancellation('loan', l['id'], st.session_state.get('user_name', 'Admin'), "Admin Cancel", unit_id)
                                 st.warning("Loan Canceled")
                                 st.rerun()
+                        
+                        # --- Check Details ---
+                        from src.database import get_all_check_sessions_for_loan, get_check_session_lines
+                        sessions = get_all_check_sessions_for_loan(l['id'])
+                        if sessions:
+                            for sess in sessions:
+                                s_type_label = "貸出時チェック" if sess['session_type'] == 'checkout' else "返却時チェック"
+                                with st.expander(f"📋 {s_type_label} 詳細 ({sess['performed_at']})"):
+                                    lines = get_check_session_lines(sess['id'])
+                                    if not lines:
+                                        st.caption("詳細データなし")
+                                    else:
+                                        # Table-like display
+                                        for line in lines:
+                                            # Icon based on result
+                                            r_icon = "✅" if line['result'] == 'OK' else "⚠️"
+                                            if line['result'] == 'NG': r_icon = "❌"
+                                            
+                                            st.write(f"{r_icon} **{line['item_name']}**")
+                                            if line['result'] != 'OK':
+                                                st.caption(f"Reason: {line['ng_reason']} | Found: {line['found_qty']}")
+                                            if line['comment']:
+                                                st.caption(f"Comment: {line['comment']}")
+                        
                         st.divider()
 
         with c2:
