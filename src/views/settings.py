@@ -5,16 +5,16 @@ from src.database import (
     get_all_categories, get_all_users, get_notification_members,
     add_notification_member, remove_notification_member,
     save_system_setting, get_system_setting,
-    get_notification_logs
+    get_notification_logs, create_user, delete_user, check_email_exists
 )
 
 def render_settings_view():
     from src.ui import render_header
     render_header("設定", "settings")
     
-    st.info("通知グループとSMTP設定を管理します。")
+    st.info("通知グループとSMTP設定、およびユーザーを管理します。")
     
-    tab1, tab2, tab3 = st.tabs(["📧 SMTP設定", "👥 通知グループ", "📜 通知ログ"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📧 SMTP設定", "👥 通知グループ", "👤 ユーザー管理", "📜 通知ログ"])
     
     # --- SMTP Configuration ---
     with tab1:
@@ -58,45 +58,101 @@ def render_settings_view():
         
         categories = get_all_categories()
         cat_map = {c['name']: c['id'] for c in categories}
-        selected_cat_name = st.selectbox("カテゴリ選択", list(cat_map.keys()))
-        
-        if selected_cat_name:
-            cat_id = cat_map[selected_cat_name]
-            members = get_notification_members(cat_id)
+        if cat_map:
+            selected_cat_name = st.selectbox("カテゴリ選択", list(cat_map.keys()))
             
-            # Show current members
-            st.subheader(f"Current Members for {selected_cat_name}")
-            if members:
-                for m in members:
-                    c1, c2 = st.columns([4, 1])
-                    c1.write(f"👤 {m['name']} ({m['email']})")
-                    if c2.button("削除", key=f"del_{m['id']}"):
-                        remove_notification_member(cat_id, m['id'])
+            if selected_cat_name:
+                cat_id = cat_map[selected_cat_name]
+                members = get_notification_members(cat_id)
+                
+                # Show current members
+                st.subheader(f"Current Members for {selected_cat_name}")
+                if members:
+                    for m in members:
+                        c1, c2 = st.columns([4, 1])
+                        c1.write(f"👤 {m['name']} ({m['email']})")
+                        if c2.button("削除", key=f"del_{m['id']}"):
+                            remove_notification_member(cat_id, m['id'])
+                            st.rerun()
+                else:
+                    st.write("メンバーがいません。")
+                
+                st.divider()
+                
+                # Add Member
+                st.subheader("メンバー追加")
+                all_users = get_all_users()
+                # Filter out existing members
+                member_ids = [m['id'] for m in members]
+                available_users = [u for u in all_users if u['id'] not in member_ids]
+                
+                if available_users:
+                    u_map = {f"{u['name']} ({u['email']})": u['id'] for u in available_users}
+                    selected_user_label = st.selectbox("ユーザー選択", list(u_map.keys()))
+                    if st.button("追加"):
+                        add_notification_member(cat_id, u_map[selected_user_label])
+                        st.success("メンバーを追加しました。")
                         st.rerun()
-            else:
-                st.write("メンバーがいません。")
-            
-            st.divider()
-            
-            # Add Member
-            st.subheader("メンバー追加")
-            all_users = get_all_users()
-            # Filter out existing members
-            member_ids = [m['id'] for m in members]
-            available_users = [u for u in all_users if u['id'] not in member_ids]
-            
-            if available_users:
-                u_map = {f"{u['name']} ({u['email']})": u['id'] for u in available_users}
-                selected_user_label = st.selectbox("ユーザー選択", list(u_map.keys()))
-                if st.button("追加"):
-                    add_notification_member(cat_id, u_map[selected_user_label])
-                    st.success("メンバーを追加しました。")
-                    st.rerun()
-            else:
-                st.info("追加可能なユーザーがいません（全員追加済みか、ユーザーマスタが空です）。")
+                else:
+                    st.info("追加可能なユーザーがいません（全員追加済みか、ユーザーマスタが空です）。")
+        else:
+            st.warning("カテゴリが登録されていません。マスタ管理で登録してください。")
+
+    # --- User Management ---
+    with tab3:
+        st.header("ユーザー管理")
+        st.caption("システムにログインできるユーザーを追加・削除します。")
+
+        # 1. Add User
+        with st.expander("➕ 新規ユーザー登録", expanded=False):
+            with st.form("create_user_form"):
+                new_email = st.text_input("メールアドレス (ID)")
+                new_name = st.text_input("氏名")
+                new_pass = st.text_input("パスワード", type="password")
+                new_pass_confirm = st.text_input("パスワード (確認)", type="password")
+                new_role = st.selectbox("権限", ["user", "admin", "related"], index=0, help="admin: 全権限, user: 一般, related: 関連業者")
+                
+                if st.form_submit_button("ユーザーを作成"):
+                    if not new_email or not new_name or not new_pass:
+                        st.error("全ての項目を入力してください。")
+                    elif new_pass != new_pass_confirm:
+                        st.error("パスワードが一致しません。")
+                    elif check_email_exists(new_email):
+                        st.error("このメールアドレスは既に使用されています。")
+                    else:
+                        if create_user(new_email, new_name, new_pass, new_role):
+                            st.success(f"ユーザーを作成しました: {new_name}")
+                            st.rerun()
+                        else:
+                            st.error("作成に失敗しました。")
+
+        st.divider()
+
+        # 2. List Users
+        st.subheader("登録済みユーザー一覧")
+        
+        users = get_all_users()
+        if users:
+            for u in users:
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([2, 1, 1])
+                    role_badge = "👑 Admin" if u['role'] == 'admin' else "👤 User" if u['role'] == 'user' else "🏢 Related"
+                    c1.markdown(f"**{u['name']}** ({u['email']})")
+                    c2.caption(role_badge)
+                    
+                    # Prevent deleting self or last admin handled in DB, but good to act here too
+                    if c3.button("削除", key=f"del_user_{u['id']}", type="secondary"):
+                        success, msg = delete_user(u['id'])
+                        if success:
+                            st.warning(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+        else:
+            st.info("ユーザーがいません。")
 
     # --- Logs ---
-    with tab3:
+    with tab4:
         st.header("通知ログ")
         if st.button("更新"):
             st.rerun()

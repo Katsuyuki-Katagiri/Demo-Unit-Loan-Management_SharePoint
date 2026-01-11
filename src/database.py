@@ -268,6 +268,61 @@ def check_users_exist() -> bool:
     conn.close()
     return count > 0
 
+def create_user(email: str, name: str, password_str: str, role: str = 'user') -> bool:
+    """Create a new user."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    password_bytes = password_str.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    
+    try:
+        c.execute("INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)", (email, hashed, name, role))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+def delete_user(user_id: int) -> tuple[bool, str]:
+    """Delete a user. Prevent deleting the last admin."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    # Check if user exists
+    c.execute("SELECT role FROM users WHERE id = ?", (user_id,))
+    user = c.fetchone()
+    if not user:
+        conn.close()
+        return False, "ユーザーが見つかりません。"
+        
+    # If deleting an admin, check if it's the last one
+    if user[0] == 'admin':
+        c.execute("SELECT count(*) FROM users WHERE role = 'admin'")
+        admin_count = c.fetchone()[0]
+        if admin_count <= 1:
+            conn.close()
+            return False, "最後の管理者は削除できません。"
+            
+    try:
+        # Also remove from notification groups
+        c.execute("DELETE FROM notification_groups WHERE user_id = ?", (user_id,))
+        
+        c.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+        return True, "ユーザーを削除しました。"
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
+def check_email_exists(email: str) -> bool:
+    """Check if an email is already registered."""
+    return get_user_by_email(email) is not None
+
+
 # --- Master Helper Functions ---
 
 def seed_categories():
@@ -844,7 +899,7 @@ def get_all_users():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT id, name, email FROM users ORDER BY name")
+    c.execute("SELECT id, name, email, role FROM users ORDER BY name")
     res = c.fetchall()
     conn.close()
     return res
