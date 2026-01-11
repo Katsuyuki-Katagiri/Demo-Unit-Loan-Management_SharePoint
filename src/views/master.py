@@ -212,8 +212,13 @@ def render_master_view():
                 current_lines = get_template_lines(selected_type_id)
                 if current_lines:
                     st.markdown("**現在の構成:**")
+                    from src.database import delete_template_line
                     for line in current_lines:
-                        st.text(f"・ {line['item_name']} (必要数: {line['required_qty']})")
+                        c1, c2 = st.columns([8, 1])
+                        c1.text(f"・ {line['item_name']} (必要数: {line['required_qty']})")
+                        if c2.button("🗑️", key=f"del_line_{line['id']}", help="この構成品を削除"):
+                             delete_template_line(selected_type_id, line['item_id'])
+                             st.rerun()
                 else:
                     st.info("構成品が登録されていません。")
                 
@@ -256,6 +261,14 @@ def render_master_view():
 
         with col_i2:
             st.subheader("登録済み構成品一覧")
+            # Reduce spacing between items
+            st.markdown("""
+                <style>
+                [data-testid="stExpander"] {
+                    margin-bottom: -1rem; 
+                }
+                </style>
+            """, unsafe_allow_html=True)
             items = get_all_items()
             for i in items:
                 with st.expander(f"{i['name']}"):

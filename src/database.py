@@ -495,6 +495,14 @@ def get_template_lines(device_type_id: int):
     conn.close()
     return res
 
+def delete_template_line(device_type_id: int, item_id: int):
+    """Delete a template line item."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM template_lines WHERE device_type_id=? AND item_id=?", (device_type_id, item_id))
+    conn.commit()
+    conn.close()
+
 # -- Device Units --
 def create_device_unit(device_type_id: int, lot_number: str, mfg_date: str = "", location: str = "", last_check_date: str = "", next_check_date: str = ""):
     conn = sqlite3.connect(DB_PATH)
