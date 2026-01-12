@@ -147,6 +147,20 @@ def render_home_view():
                             for sess in sessions:
                                 s_type_label = "貸出時チェック" if sess['session_type'] == 'checkout' else "返却時チェック"
                                 with st.expander(f"📋 {s_type_label} 詳細 ({sess['performed_at']})"):
+                                    # Show Photos
+                                    if sess['device_photo_dir']:
+                                        photo_dir_path = os.path.join(UPLOAD_DIR, sess['device_photo_dir'])
+                                        if os.path.exists(photo_dir_path):
+                                            photos = [f for f in os.listdir(photo_dir_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+                                            if photos:
+                                                st.caption("記録写真")
+                                                for i in range(0, len(photos), 4):
+                                                    cols = st.columns(4)
+                                                    for j in range(4):
+                                                        if i + j < len(photos):
+                                                            cols[j].image(os.path.join(photo_dir_path, photos[i+j]), use_container_width=True)
+                                                st.divider()
+
                                     lines = get_check_session_lines(sess['id'])
                                     if not lines:
                                         st.caption("詳細データなし")
