@@ -182,10 +182,14 @@ def render_return_view(unit_id: int):
 
     
     
-    # General Check Item
+     # General Check Item
     st.write("")
     is_clean_checked = st.checkbox("汚れはありませんか（血液等の汚れはきちんと清掃して下さい）", key="check_clean_ret")
     
+    st.divider()
+    st.markdown("### 備考（任意）")
+    remarks = st.text_area("自由に記載できます", placeholder="例：付属品の欠品あり、異音ありなど", key="return_remarks")
+
     st.write("")
     assetment_returned = st.checkbox("AssetmentNeoの返却処理を忘れずに行って下さい", key="check_assetment_ret")
     if not assetment_returned:
@@ -295,7 +299,9 @@ def render_return_view(unit_id: int):
                     check_results=check_results_list,
                     photo_dir=session_dir_name, 
                     user_name=user_name,
-                    assetment_returned=assetment_returned
+                    user_id=st.session_state.get('user_id'),
+                    assetment_returned=assetment_returned,
+                    notes=remarks
                 )
                 
                 if result_status == 'in_stock':

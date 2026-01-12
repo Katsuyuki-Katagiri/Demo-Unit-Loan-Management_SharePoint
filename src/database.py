@@ -860,23 +860,41 @@ def migrate_returns_assetment_check():
     finally:
         conn.close()
 
+def migrate_returns_notes():
+    """Migrate returns table to include notes column."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(returns)")
+        columns = [r[1] for r in c.fetchall()]
+        if 'notes' not in columns:
+            print("Migrating returns: adding notes column...")
+            c.execute("ALTER TABLE returns ADD COLUMN notes TEXT")
+            conn.commit()
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        conn.close()
+
 def create_return(
     loan_id: int,
     return_date: str,
     checker_user_id: Optional[int] = None,
-    assetment_returned: bool = False
+    assetment_returned: bool = False,
+    notes: str = None
 ) -> int:
     # Ensure migration has run
     migrate_returns_assetment_check()
+    migrate_returns_notes()
     
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
     # 1. Create Return Record
     c.execute("""
-        INSERT INTO returns (loan_id, return_date, checker_user_id, assetment_returned)
-        VALUES (?, ?, ?, ?)
-    """, (loan_id, return_date, checker_user_id, 1 if assetment_returned else 0))
+        INSERT INTO returns (loan_id, return_date, checker_user_id, assetment_returned, notes)
+        VALUES (?, ?, ?, ?, ?)
+    """, (loan_id, return_date, checker_user_id, 1 if assetment_returned else 0, notes))
     return_id = c.lastrowid
     
     # 2. Close the Loan
@@ -1123,7 +1141,28 @@ def get_notification_members(category_id: int):
     conn.close()
     return res
 
+def migrate_notifications_table():
+    """Ensure notification_logs table exists."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS notification_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            related_id INTEGER,
+            recipient TEXT NOT NULL,
+            status TEXT NOT NULL,
+            error_message TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
 def log_notification(event_type: str, related_id: int, recipient: str, status: str, error_message: str = None):
+    # Ensure table exists
+    migrate_notifications_table()
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
@@ -1142,7 +1181,21 @@ def get_notification_logs(limit: int = 50):
     conn.close()
     return res
 
+def migrate_system_settings_table():
+    """Ensure system_settings table exists."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS system_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
 def save_system_setting(key: str, value: str):
+    migrate_system_settings_table()
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)", (key, value))
@@ -1150,6 +1203,7 @@ def save_system_setting(key: str, value: str):
     conn.close()
 
 def get_system_setting(key: str):
+    migrate_system_settings_table()
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT value FROM system_settings WHERE key = ?", (key,))

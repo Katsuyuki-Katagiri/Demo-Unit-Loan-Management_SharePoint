@@ -1,0 +1,10 @@
+--- SMTP Config ---
+{"enabled": true, "host": "smtp.office365.com", "port": 587, "user": "k.katagiri@mera.co.jp", "password": "K.katagiri=5963", "from_addr": "k.katagiri@mera.co.jp"}
+
+--- Recent Notification Logs ---
+{'id': 3, 'event_type': 'return_confirmation', 'related_id': 20, 'recipient': '片桐勝幸 (k.katagiri@mera.co.jp)', 'status': 'failed', 'error_message': "(535, b'5.7.139 Authentication unsuccessful, the user credentials were incorrect. [TYCP286CA0203.JPNP286.PROD.OUTLOOK.COM 2026-01-12T07:14:43.231Z 08DE50D471C79E5F]')", 'created_at': '2026-01-12 07:14:44'}
+{'id': 2, 'event_type': 'loan_confirmation', 'related_id': 20, 'recipient': '片桐勝幸 (k.katagiri@mera.co.jp)', 'status': 'failed', 'error_message': "(535, b'5.7.139 Authentication unsuccessful, the user credentials were incorrect. [TYCP286CA0045.JPNP286.PROD.OUTLOOK.COM 2026-01-12T07:09:40.571Z 08DE50ADC7586E21]')", 'created_at': '2026-01-12 07:09:42'}
+
+--- Users ---
+{'id': 1, 'name': 'Admin User', 'email': 'admin@example.com'}
+{'id': 2, 'name': '片桐勝幸', 'email': 'k.katagiri@mera.co.jp'}

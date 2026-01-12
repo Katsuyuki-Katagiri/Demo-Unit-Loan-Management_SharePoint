@@ -50,6 +50,46 @@ def render_settings_view():
                 }
                 save_system_setting('smtp_config', json.dumps(new_config))
                 st.success("SMTP設定を保存しました。")
+
+        st.divider()
+        st.subheader("接続テスト")
+        test_email = st.text_input("テスト送信先メールアドレス", placeholder="your_email@example.com")
+        if st.button("テストメール送信"):
+            if not test_email:
+                st.error("テスト送信先を入力してください。")
+            else:
+                # Use current saved settings (or should we use form values? Form values are gone after submit)
+                # We use saved settings for simplicity, forcing user to save first.
+                # Actually, capturing form state is hard without saving.
+                # Let's verify saved settings.
+                
+                saved_config_json = get_system_setting('smtp_config')
+                if not saved_config_json:
+                     st.error("設定が保存されていません。先に保存してください。")
+                else:
+                    conf = json.loads(saved_config_json)
+                    if not conf.get('enabled'):
+                        st.warning("設定では「メール通知を有効にする」がOFFになっていますが、テスト送信を試みます。")
+                        
+                    import smtplib
+                    from email.mime.text import MIMEText
+                    
+                    try:
+                        msg = MIMEText("This is a test email from Demo Unit Loan Management System.")
+                        msg['Subject'] = "[Test] SMTP Connection Verification"
+                        msg['From'] = conf.get('from_addr', 'noreply@example.com')
+                        msg['To'] = test_email
+                        
+                        with smtplib.SMTP(conf.get('host', 'localhost'), int(conf.get('port', 25))) as server:
+                             if int(conf.get('port', 25)) == 587:
+                                 server.starttls()
+                             if conf.get('user') and conf.get('password'):
+                                 server.login(conf.get('user'), conf.get('password'))
+                             server.send_message(msg)
+                        
+                        st.success(f"送信成功！ ({test_email})")
+                    except Exception as e:
+                        st.error(f"送信失敗:\n{e}")
                 
     # --- User Management ---
     with tab2:

@@ -274,6 +274,7 @@ def render_loan_view(unit_id: int):
                     check_results=check_results_list,
                     photo_dir=session_dir_name, # Relative path
                     user_name=user_name,
+                    user_id=st.session_state.get('user_id'),
                     assetment_checked=assetment_checked,
                     notes=remarks
                 )
