@@ -171,6 +171,14 @@ def render_home_view():
                                         else:
                                             st.warning("⚠️ AssetmentNeo 登録未確認")
                                         st.divider()
+                                    elif sess['session_type'] == 'return':
+                                        # Assetment check for Return
+                                        is_returned = l['assetment_returned'] if 'assetment_returned' in l.keys() else 0
+                                        if is_returned:
+                                            st.success("✅ AssetmentNeo 返却処理確認済み")
+                                        else:
+                                            st.warning("⚠️ AssetmentNeo 返却処理未確認")
+                                        st.divider()
                                     # Show Photos
                                     if sess['device_photo_dir']:
                                         photo_dir_path = os.path.join(UPLOAD_DIR, sess['device_photo_dir'])

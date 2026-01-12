@@ -331,7 +331,8 @@ def process_return(
     check_results: list,
     photo_dir: str,
     user_id: int = None,
-    user_name: str = "Unknown"
+    user_name: str = "Unknown",
+    assetment_returned: bool = False
 ):
     """
     Process a return request.
@@ -353,7 +354,8 @@ def process_return(
     create_return(
         loan_id=loan_id,
         return_date=return_date,
-        checker_user_id=user_id
+        checker_user_id=user_id,
+        assetment_returned=assetment_returned
     )
     
     # 3. Create Check Session

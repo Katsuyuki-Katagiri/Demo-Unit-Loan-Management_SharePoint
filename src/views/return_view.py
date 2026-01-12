@@ -185,6 +185,11 @@ def render_return_view(unit_id: int):
     # General Check Item
     st.write("")
     is_clean_checked = st.checkbox("汚れはありませんか（血液等の汚れはきちんと清掃して下さい）", key="check_clean_ret")
+    
+    st.write("")
+    assetment_returned = st.checkbox("AssetmentNeoの返却処理を忘れずに行って下さい", key="check_assetment_ret")
+    if not assetment_returned:
+        st.info("💡 返却登録が済んでいない場合は [https://saas.assetment.net/AS3230-PA0200320/](https://saas.assetment.net/AS3230-PA0200320/) から返却登録を行ってから返却を確定してください")
 
     st.divider()
     
@@ -192,6 +197,8 @@ def render_return_view(unit_id: int):
     errors = []
     if not is_clean_checked:
         errors.append("「汚れはありませんか」のチェックを確認してください")
+    if not assetment_returned:
+        errors.append("AssetmentNeoの返却処理確認を行ってください")
 
     if not uploaded_files and not camera_image:
         errors.append("写真を最低1枚保存してください（アップロード または カメラ撮影）")
@@ -199,7 +206,7 @@ def render_return_view(unit_id: int):
     if errors:
         for e in errors:
             st.error(e)
-        st.button("登録 (入力不備があります)", disabled=True, key="btn_ret_disabled")
+        st.button("返却を確定する", type="primary", disabled=True, key="btn_ret_disabled")
     else:
         if st.button("返却を確定する", type="primary", key="btn_ret_submit"):
             # Process Submission
@@ -287,7 +294,8 @@ def render_return_view(unit_id: int):
                     return_date=return_date.isoformat(),
                     check_results=check_results_list,
                     photo_dir=session_dir_name, 
-                    user_name=user_name
+                    user_name=user_name,
+                    assetment_returned=assetment_returned
                 )
                 
                 if result_status == 'in_stock':

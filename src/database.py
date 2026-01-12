@@ -825,19 +825,39 @@ def create_check_line(
 
 # -- Phase 3 Operations --
 
+def migrate_returns_assetment_check():
+    """Migrate returns table to include assetment_returned column."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(returns)")
+        columns = [r[1] for r in c.fetchall()]
+        if 'assetment_returned' not in columns:
+            print("Migrating returns: adding assetment_returned column...")
+            c.execute("ALTER TABLE returns ADD COLUMN assetment_returned INTEGER DEFAULT 0")
+            conn.commit()
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        conn.close()
+
 def create_return(
     loan_id: int,
     return_date: str,
-    checker_user_id: Optional[int] = None
+    checker_user_id: Optional[int] = None,
+    assetment_returned: bool = False
 ) -> int:
+    # Ensure migration has run
+    migrate_returns_assetment_check()
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
     # 1. Create Return Record
     c.execute("""
-        INSERT INTO returns (loan_id, return_date, checker_user_id)
-        VALUES (?, ?, ?)
-    """, (loan_id, return_date, checker_user_id))
+        INSERT INTO returns (loan_id, return_date, checker_user_id, assetment_returned)
+        VALUES (?, ?, ?, ?)
+    """, (loan_id, return_date, checker_user_id, 1 if assetment_returned else 0))
     return_id = c.lastrowid
     
     # 2. Close the Loan
@@ -1003,17 +1023,26 @@ def migrate_phase4():
     conn.close()
 
 def get_loan_history(device_unit_id: int, limit: int = None, offset: int = 0, include_canceled: bool = True):
+    # Ensure schema is up to date (needed for new Assetment columns if not yet run)
+    migrate_returns_assetment_check()
+    
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     
-    query = "SELECT * FROM loans WHERE device_unit_id = ?"
+    # Left join to get return info if available (get the latest valid return)
+    query = """
+        SELECT l.*, r.assetment_returned
+        FROM loans l
+        LEFT JOIN returns r ON l.id = r.loan_id AND (r.canceled = 0 OR r.canceled IS NULL)
+        WHERE l.device_unit_id = ?
+    """
     params = [device_unit_id]
     
     if not include_canceled:
-        query += " AND (canceled = 0 OR canceled IS NULL)"
+        query += " AND (l.canceled = 0 OR l.canceled IS NULL)"
         
-    query += " ORDER BY id DESC"
+    query += " ORDER BY l.id DESC"
     
     if limit is not None:
         query += " LIMIT ? OFFSET ?"
