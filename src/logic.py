@@ -22,13 +22,13 @@ def get_image_base64(image_path):
         print(f"Error encoding image: {e}")
         return None
 
-def compress_image(image_file, max_size=(1280, 1280), quality=85):
+def compress_image(image_file, max_size=(800, 800), quality=65):
     """
     Compress and resize an image.
     Args:
         image_file: UploadedFile or BytesIO object
-        max_size: tuple (width, height) for max dimensions (Default: 1280x1280)
-        quality: WebP quality (1-100) (Default: 85)
+        max_size: tuple (width, height) for max dimensions (Default: 800x800)
+        quality: WebP quality (1-100) (Default: 65)
     Returns:
         BytesIO object containing the compressed WebP image
     """
