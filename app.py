@@ -65,7 +65,7 @@ def main():
         
         if st.session_state.get('user_role') == 'admin':
             page_options.append("マスタ管理")
-            page_options.append("設定")
+            page_options.append("通知設定")
             
         selected_page = st.radio("メニュー", page_options)
         
@@ -82,7 +82,7 @@ def main():
         render_analytics_view()
     elif selected_page == "マスタ管理":
         render_master_view()
-    elif selected_page == "設定":
+    elif selected_page == "通知設定":
         from src.views.settings import render_settings_view
         render_settings_view()
 

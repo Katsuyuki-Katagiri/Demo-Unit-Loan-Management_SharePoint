@@ -12,7 +12,7 @@ from src.database import (
 
 def render_settings_view():
     from src.ui import render_header
-    render_header("設定", "settings")
+    render_header("通知設定", "settings")
     
     st.info("通知グループとSMTP設定、およびユーザーを管理します。")
     

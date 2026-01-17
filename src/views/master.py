@@ -141,7 +141,7 @@ def render_master_view():
                 with st.form("add_type_form"):
                     cats = get_all_categories()
                     cat_options = {c['name']: c['id'] for c in cats}
-                    selected_cat = st.selectbox("大分類", options=list(cat_options.keys()))
+                    selected_cat = st.selectbox("カテゴリ", options=list(cat_options.keys()))
                     type_name = st.text_input("機種名")
                     if st.form_submit_button("登録"):
                         if type_name:
@@ -152,7 +152,7 @@ def render_master_view():
 
             # Select Existing
             st.markdown("### 機種を選択")
-            filter_cat = st.selectbox("大分類フィルター", ["全て"] + list(cat_options.keys()))
+            filter_cat = st.selectbox("カテゴリフィルター", ["全て"] + list(cat_options.keys()))
             
             if filter_cat == "全て":
                 types = get_device_types()
@@ -165,33 +165,55 @@ def render_master_view():
         with col2:
             if selected_type_key:
                 selected_type_id = type_opts[selected_type_key]
-                st.subheader(f"編集: {selected_type_key}")
+                # Get current type info
+                current_type = next((t for t in types if t['id'] == selected_type_id), None)
+                current_type_name = current_type['name'] if current_type else ""
+                
+                # Header with delete button
+                header_col, delete_col = st.columns([6, 1])
+                with header_col:
+                    st.subheader(f"編集: {current_type_name}")
+                with delete_col:
+                    # Initialize delete confirmation state
+                    if 'confirm_delete_type' not in st.session_state:
+                        st.session_state.confirm_delete_type = False
+                    
+                    if st.button("🗑️", key="delete_type_btn", help="この機種を削除"):
+                        st.session_state.confirm_delete_type = True
+                        st.rerun()
+                
+                # Show confirmation dialog
+                if st.session_state.get('confirm_delete_type', False):
+                    st.warning(f"⚠️ 「{current_type_name}」を削除しますか？紐付いている全ての実機、貸出履歴、点検記録が完全に削除されます。")
+                    confirm_col1, confirm_col2, _ = st.columns([1, 1, 3])
+                    with confirm_col1:
+                        if st.button("はい、削除する", type="primary", key="confirm_yes"):
+                            from src.database import delete_device_type
+                            success, msg = delete_device_type(selected_type_id)
+                            st.session_state.confirm_delete_type = False
+                            if success:
+                                st.cache_data.clear()
+                                st.warning(msg)
+                                st.rerun()
+                            else:
+                                st.error(msg)
+                    with confirm_col2:
+                        if st.button("キャンセル", key="confirm_no"):
+                            st.session_state.confirm_delete_type = False
+                            st.rerun()
                 
                 # --- Edit Device Name ---
-                with st.expander("機種名を編集"):
+                with st.expander("✏️ 機種名を編集"):
                     with st.form("edit_type_name_form"):
-                        new_type_name = st.text_input("機種名", value="")
+                        new_type_name = st.text_input("機種名", value=current_type_name)
                         if st.form_submit_button("変更"):
-                            if new_type_name:
+                            if new_type_name and new_type_name != current_type_name:
                                 if update_device_type_name(selected_type_id, new_type_name):
                                     st.cache_data.clear()
                                     st.success("機種名を変更しました")
                                     st.rerun()
                                 else:
                                     st.error("エラー: その機種名は既に使用されている可能性があります")
-
-                # --- Delete Device Type ---
-                with st.expander("機種を削除", expanded=False):
-                    st.warning("⚠️ 注意: この機種を削除すると、紐付いている全ての実機（ユニット）、貸出履歴、点検記録が完全に削除されます。この操作は取り消せません。")
-                    if st.button("この機種を完全に削除する", type="primary"):
-                        from src.database import delete_device_type
-                        success, msg = delete_device_type(selected_type_id)
-                        if success:
-                            st.cache_data.clear()
-                            st.warning(msg)
-                            st.rerun()
-                        else:
-                            st.error(msg)
                             
                 st.divider()
                 
@@ -306,7 +328,7 @@ def render_master_view():
                 else:
                     st.info("構成品が登録されていません。")
                 
-                with st.expander("構成品を追加/編集"):
+                with st.expander("構成品を追加/編集 （※希望する構成品がない場合は「構成品マスタ」タブから構成品を追加してください）"):
                     with st.form("add_tpl_line"):
                         all_items = get_all_items()
                         item_opts = {f"{i['name']}": i['id'] for i in all_items}
