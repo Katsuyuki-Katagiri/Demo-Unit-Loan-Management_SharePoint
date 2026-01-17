@@ -186,14 +186,14 @@ def render_return_view(unit_id: int):
     st.write("")
     is_clean_checked = st.checkbox("汚れはありませんか（血液等の汚れはきちんと清掃して下さい）", key="check_clean_ret")
     
-    st.divider()
-    st.markdown("### 備考（任意）")
-    remarks = st.text_area("自由に記載できます", placeholder="例：付属品の欠品あり、異音ありなど", key="return_remarks")
-
     st.write("")
     assetment_returned = st.checkbox("AssetmentNeoの返却処理を忘れずに行って下さい", key="check_assetment_ret")
     if not assetment_returned:
         st.info("💡 返却登録が済んでいない場合は [https://saas.assetment.net/AS3230-PA0200320/](https://saas.assetment.net/AS3230-PA0200320/) から返却登録を行ってから返却を確定してください")
+
+    st.divider()
+    st.markdown("### 備考（任意）")
+    remarks = st.text_area("自由に記載できます", placeholder="例：付属品の欠品あり、異音ありなど", key="return_remarks")
 
     st.divider()
     

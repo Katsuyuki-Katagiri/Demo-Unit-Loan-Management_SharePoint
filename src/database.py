@@ -737,15 +737,18 @@ def get_open_issues(device_unit_id: int):
     conn.close()
     return res
 
-def create_issue(device_unit_id: int, check_session_id: int, summary: str, created_by: str):
+def create_issue(device_unit_id: int, check_session_id: int, summary: str, created_by: str) -> int:
+    """課題を作成し、作成された課題IDを返す。"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
         INSERT INTO issues (device_unit_id, check_session_id, status, summary, created_by)
         VALUES (?, ?, 'open', ?, ?)
     """, (device_unit_id, check_session_id, summary, created_by))
+    issue_id = c.lastrowid
     conn.commit()
     conn.close()
+    return issue_id
 
 # -- Phase 2 Operations --
 
@@ -791,9 +794,7 @@ def create_loan(
     assetment_checked: bool = False,
     notes: str = None
 ) -> int:
-    # Ensure migrations have run
-    migrate_loans_assetment_check()
-    migrate_loans_notes()
+    # マイグレーションはapp.py起動時に実行されるため、ここでは不要
     
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -883,9 +884,7 @@ def create_return(
     assetment_returned: bool = False,
     notes: str = None
 ) -> int:
-    # Ensure migration has run
-    migrate_returns_assetment_check()
-    migrate_returns_notes()
+    # マイグレーションはapp.py起動時に実行されるため、ここでは不要
     
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()

@@ -2,7 +2,6 @@ from src.database import (
     get_template_lines, get_unit_overrides, DB_PATH
 )
 import sqlite3
-import sqlite3
 import threading
 from PIL import Image, ImageOps # type: ignore
 import base64
@@ -201,17 +200,16 @@ def process_loan(
             trigger_issue_notification(device_unit_id, issue_id, res['name'], res.get('ng_reason'))
             
     # 5. Update Status
-    # Notify User
-    if user_id:
-        # Prepare email body
-        type_info = get_device_type_by_id(unit['device_type_id'])
-        device_name = type_info['name']
-        lot_number = unit['lot_number']
-        
-        status_msg = "貸出登録が完了しました。"
-        if has_ng: status_msg += " (注意: NG項目があります)"
-        
-        email_body = f"""
+    # Notify User + Group
+    # Prepare email body
+    type_info = get_device_type_by_id(unit['device_type_id'])
+    device_name = type_info['name']
+    lot_number = unit['lot_number']
+    
+    status_msg = "貸出登録が完了しました。"
+    if has_ng: status_msg += " (注意: NG項目があります)"
+    
+    email_body = f"""
 {user_name} 様
 
 以下の内容で貸出登録を行いました。
@@ -225,7 +223,26 @@ def process_loan(
 
 {status_msg}
 """
+    # 操作者本人への通知
+    if user_id:
         trigger_user_notification(user_id, f"[貸出完了] {device_name} (Lot: {lot_number})", email_body, 'loan_confirmation', loan_id)
+    
+    # 通知グループへの通知（グループメンバー全員）
+    group_email_body = f"""
+{{recipient_name}} 様
+
+{user_name} が以下の機器を貸出しました。
+
+■装置名: {device_name}
+■ロット: {lot_number}
+■持出日: {checkout_date}
+■貸出先: {destination}
+■貸出目的: {purpose}
+■備考: {notes if notes else 'なし'}
+
+{status_msg}
+"""
+    trigger_group_notification(device_unit_id, f"[貸出通知] {device_name} (Lot: {lot_number})", group_email_body, 'loan_group_notification', loan_id)
 
     if has_ng:
         update_unit_status(device_unit_id, 'needs_attention')
@@ -251,8 +268,7 @@ def recalculate_unit_status(device_unit_id: int):
     2. Active Loan (not canceled) -> 'loaned'
     3. Else -> 'in_stock'
     """
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
+    # 他の関数を通じてDBアクセスするため、ここでの接続は不要
     
     # Check Issues
     issues = get_open_issues(device_unit_id)
@@ -266,7 +282,6 @@ def recalculate_unit_status(device_unit_id: int):
         else:
             new_status = 'in_stock'
             
-    conn.close()
     update_unit_status(device_unit_id, new_status)
     return new_status
 
@@ -417,19 +432,18 @@ def process_return(
             issue_id = create_issue(device_unit_id, session_id, summary, user_name)
             trigger_issue_notification(device_unit_id, issue_id, res['name'], res.get('ng_reason'))
             
-    # Notify User
-    if user_id:
-        # Get Unit info for email
-        unit = get_device_unit_by_id(device_unit_id)
-        type_info = get_device_type_by_id(unit['device_type_id'])
-        device_name = type_info['name']
-        lot_number = unit['lot_number']
-        return_loc = unit['location'] if unit['location'] else "指定なし"
-        
-        status_msg = "返却登録が完了しました。"
-        if has_ng: status_msg += " (注意: NG項目があります)"
-        
-        email_body = f"""
+    # Notify User + Group
+    # Get Unit info for email
+    unit = get_device_unit_by_id(device_unit_id)
+    type_info = get_device_type_by_id(unit['device_type_id'])
+    device_name = type_info['name']
+    lot_number = unit['lot_number']
+    return_loc = unit['location'] if unit['location'] else "指定なし"
+    
+    status_msg = "返却登録が完了しました。"
+    if has_ng: status_msg += " (注意: NG項目があります)"
+    
+    email_body = f"""
 {user_name} 様
 
 以下の内容で返却登録を行いました。
@@ -443,7 +457,26 @@ def process_return(
 
 {status_msg}
 """
+    # 操作者本人への通知
+    if user_id:
         trigger_user_notification(user_id, f"[返却完了] {device_name} (Lot: {lot_number})", email_body, 'return_confirmation', loan_id)
+    
+    # 通知グループへの通知（グループメンバー全員）
+    group_email_body = f"""
+{{recipient_name}} 様
+
+{user_name} が以下の機器を返却しました。
+
+■装置名: {device_name}
+■ロット: {lot_number}
+■返却日: {return_date}
+■返却先: {return_loc}
+■貸出目的: {active_loan['purpose']}
+■備考: {notes if notes else 'なし'}
+
+{status_msg}
+"""
+    trigger_group_notification(device_unit_id, f"[返却通知] {device_name} (Lot: {lot_number})", group_email_body, 'return_group_notification', loan_id)
 
     # 5. Update Status (Recalculate)
     # Check if ANY open issues exist (from this return OR previous)
@@ -454,8 +487,6 @@ def process_return(
     else:
         update_unit_status(device_unit_id, 'in_stock')
         return "in_stock"
-
-    recalculate_unit_status(device_unit_id)
 
 
 
@@ -602,6 +633,78 @@ def _blocking_user_notification(user_id: int, subject: str, body: str, log_event
             error_msg = str(e)
             
     log_notification(log_event_type, related_id, f"{recipient_name} ({recipient_email})", log_status, error_msg)
+
+
+def trigger_group_notification(device_unit_id: int, subject: str, body: str, log_event_type: str, related_id: int):
+    """
+    通知グループメンバー全員に通知を送信する（貸出/返却完了時用）。
+    バックグラウンドスレッドで実行。
+    """
+    t = threading.Thread(target=_blocking_group_notification, args=(device_unit_id, subject, body, log_event_type, related_id))
+    t.start()
+
+def _blocking_group_notification(device_unit_id: int, subject: str, body: str, log_event_type: str, related_id: int):
+    """
+    通知グループへの通知ロジック（スレッドで実行）。
+    1. Unit -> Type -> Category を特定
+    2. そのカテゴリの通知グループメンバーを取得
+    3. 全員にメール送信
+    """
+    # 1. Get Unit -> Type -> Category
+    unit = get_device_unit_by_id(device_unit_id)
+    if not unit:
+        return
+    type_info = get_device_type_by_id(unit['device_type_id'])
+    if not type_info:
+        return
+    category_id = type_info['category_id']
+    
+    members = get_notification_members(category_id)
+    if not members:
+        return  # 通知先なし
+        
+    # 2. SMTP Settings
+    smtp_config_json = get_system_setting('smtp_config')
+    smtp_enabled = False
+    smtp_config = {}
+    if smtp_config_json:
+        try:
+            smtp_config = json.loads(smtp_config_json)
+            smtp_enabled = smtp_config.get('enabled', False)
+        except:
+            pass
+            
+    # 3. メンバー全員に送信
+    for m in members:
+        recipient_email = m['email']
+        recipient_name = m['name']
+        
+        log_status = 'logged_only'
+        error_msg = None
+        
+        # 本文を宛先名で置換（{recipient_name}がある場合）
+        personalized_body = body.replace('{recipient_name}', recipient_name)
+        
+        if smtp_enabled and recipient_email:
+            try:
+                msg = MIMEText(personalized_body)
+                msg['Subject'] = subject
+                msg['From'] = smtp_config.get('from_addr', 'noreply@example.com')
+                msg['To'] = recipient_email
+                
+                with smtplib.SMTP(smtp_config.get('host', 'localhost'), int(smtp_config.get('port', 25))) as server:
+                    if smtp_config.get('user') and smtp_config.get('password'):
+                        if int(smtp_config.get('port', 25)) == 587:
+                            server.starttls()
+                        server.login(smtp_config.get('user'), smtp_config.get('password'))
+                    server.send_message(msg)
+                
+                log_status = 'sent'
+            except Exception as e:
+                log_status = 'failed'
+                error_msg = str(e)
+                
+        log_notification(log_event_type, related_id, f"{recipient_name} ({recipient_email})", log_status, error_msg)
 
 
 def calculate_utilization(device_unit_id: int, start_date_str: str, end_date_str: str):

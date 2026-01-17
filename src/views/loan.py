@@ -180,14 +180,14 @@ def render_loan_view(unit_id: int):
 
 
     st.divider()
-    st.markdown("### 備考（任意）")
-    remarks = st.text_area("自由に記載できます", placeholder="例：〇〇先生使用分、返却予定日など", key="loan_remarks")
-
-    st.divider()
     st.markdown("### 外部システム登録確認")
     assetment_checked = st.checkbox("AssetmentNeoの貸出登録は済んでいますか？")
     if not assetment_checked:
         st.info("💡 貸出登録が済んでいない場合は [https://saas.assetment.net/AS3230-PA0200320/](https://saas.assetment.net/AS3230-PA0200320/) から貸出登録を行ってから持出お願いします")
+
+    st.divider()
+    st.markdown("### 備考（任意）")
+    remarks = st.text_area("自由に記載できます", placeholder="例：〇〇先生使用分、返却予定日など", key="loan_remarks")
 
     
     # Error Display

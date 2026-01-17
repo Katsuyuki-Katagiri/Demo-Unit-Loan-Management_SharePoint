@@ -18,7 +18,7 @@ def render_settings_view():
     
     # --- SMTP Configuration ---
     with tab1:
-        st.header("SMTP Configuration")
+        st.header("SMTP設定")
         st.caption("メール通知を使用する場合に設定してください。")
         
         current_config_json = get_system_setting('smtp_config')
@@ -37,11 +37,11 @@ def render_settings_view():
         with st.form("smtp_form"):
             enabled = st.checkbox("メール通知を有効にする", value=default_config['enabled'])
             c1, c2 = st.columns(2)
-            host = c1.text_input("SMTP Host", value=default_config['host'])
-            port = c2.number_input("SMTP Port", value=int(default_config['port']))
-            user = c1.text_input("SMTP User", value=default_config['user'])
-            password = c2.text_input("SMTP Password", value=default_config['password'], type="password")
-            from_addr = st.text_input("From Address", value=default_config['from_addr'])
+            host = c1.text_input("SMTPホスト", value=default_config['host'], help="例: smtp.gmail.com")
+            port = c2.number_input("SMTPポート", value=int(default_config['port']), help="例: 587")
+            user = c1.text_input("SMTPユーザー名", value=default_config['user'])
+            password = c2.text_input("SMTPパスワード", value=default_config['password'], type="password")
+            from_addr = st.text_input("送信元メールアドレス (From)", value=default_config['from_addr'])
             
             if st.form_submit_button("保存"):
                 new_config = {
@@ -129,7 +129,7 @@ def render_settings_view():
             for u in users:
                 with st.container(border=True):
                     c1, c2, c3 = st.columns([2, 1, 1])
-                    role_badge = "👑 Admin" if u['role'] == 'admin' else "👤 User" if u['role'] == 'user' else "🏢 Related"
+                    role_badge = "👑 管理者" if u['role'] == 'admin' else "👤 一般" if u['role'] == 'user' else "🏢 関連業者"
                     c1.markdown(f"**{u['name']}** ({u['email']})")
                     c2.caption(role_badge)
                     
@@ -159,7 +159,7 @@ def render_settings_view():
                 members = get_notification_members(cat_id)
                 
                 # Show current members
-                st.subheader(f"Current Members for {selected_cat_name}")
+                st.subheader(f"{selected_cat_name} の通知先メンバー")
                 if members:
                     for m in members:
                         c1, c2 = st.columns([4, 1])

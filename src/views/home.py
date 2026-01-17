@@ -245,12 +245,8 @@ def render_home_view():
                 </style>
             """
             st.markdown(base_style, unsafe_allow_html=True)
-
-            active_loan = get_active_loan(unit_id)
             
-            # Re-check issues (might be resolved just now)
-            can_loan = (unit['status'] == 'in_stock') and (not issues)
-            can_return = (unit['status'] == 'loaned') or (active_loan)
+            # active_loan, can_loan, can_returnは上で既に計算済みのため再計算不要
             
             if can_loan:
                 # Inject Blue Color
