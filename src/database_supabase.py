@@ -928,3 +928,195 @@ def delete_device_type(type_id: int):
     except Exception as e:
         return False, str(e)
 
+def get_notification_members(category_id: int):
+    """カテゴリの通知メンバーを取得"""
+    client = get_client()
+    result = client.table("notification_groups").select("user_id, users(id, name, email)").eq("category_id", category_id).execute()
+    
+    members = []
+    for row in result.data:
+        user = row.get("users", {})
+        if user:
+            members.append(user)
+    return members
+
+def add_notification_member(category_id: int, user_id: int):
+    """通知メンバーを追加"""
+    client = get_client()
+    try:
+        client.table("notification_groups").insert({
+            "category_id": category_id,
+            "user_id": user_id
+        }).execute()
+        return True
+    except Exception:
+        return False
+
+def remove_notification_member(category_id: int, user_id: int):
+    """通知メンバーを削除"""
+    client = get_client()
+    client.table("notification_groups").delete().eq("category_id", category_id).eq("user_id", user_id).execute()
+
+def get_category_managing_department(category_id: int):
+    """カテゴリの管理部署を取得"""
+    client = get_client()
+    
+    # カテゴリを取得
+    cat_result = client.table("categories").select("managing_department_id").eq("id", category_id).execute()
+    if not cat_result.data or not cat_result.data[0].get("managing_department_id"):
+        return None
+    
+    dept_id = cat_result.data[0]["managing_department_id"]
+    
+    # 部署を取得
+    dept_result = client.table("departments").select("*").eq("id", dept_id).execute()
+    if dept_result.data:
+        return dept_result.data[0]
+    return None
+
+def update_category_managing_department(category_id: int, department_id: int = None):
+    """カテゴリの管理部署を更新"""
+    client = get_client()
+    try:
+        client.table("categories").update({"managing_department_id": department_id}).eq("id", category_id).execute()
+        return True
+    except Exception:
+        return False
+
+def get_department_by_id(department_id: int):
+    """部署をIDで取得"""
+    client = get_client()
+    result = client.table("departments").select("*").eq("id", department_id).execute()
+    if result.data:
+        return result.data[0]
+    return None
+
+def update_department(department_id: int, name: str):
+    """部署を更新"""
+    client = get_client()
+    try:
+        client.table("departments").update({"name": name}).eq("id", department_id).execute()
+        return True
+    except Exception:
+        return False
+
+def delete_department(department_id: int):
+    """部署を削除"""
+    client = get_client()
+    
+    # 使用中か確認
+    users = client.table("users").select("id").eq("department_id", department_id).limit(1).execute()
+    if users.data:
+        return False, "この部署にはユーザーが所属しているため削除できません"
+    
+    try:
+        client.table("departments").delete().eq("id", department_id).execute()
+        return True, "部署を削除しました"
+    except Exception as e:
+        return False, str(e)
+
+def update_user_department(user_id: int, department_id: int = None):
+    """ユーザーの部署を更新"""
+    client = get_client()
+    client.table("users").update({"department_id": department_id}).eq("id", user_id).execute()
+
+def get_users_by_department(department_id: int = None):
+    """部署でユーザーを取得"""
+    client = get_client()
+    if department_id:
+        result = client.table("users").select("*").eq("department_id", department_id).execute()
+    else:
+        result = client.table("users").select("*").is_("department_id", "null").execute()
+    return result.data
+
+def get_notification_logs(limit: int = 50):
+    """通知ログを取得"""
+    client = get_client()
+    result = client.table("notification_logs").select("*").order("sent_at", desc=True).limit(limit).execute()
+    return result.data
+
+def save_system_setting(key: str, value: str):
+    """システム設定を保存（エイリアス）"""
+    return set_system_setting(key, value)
+
+def get_unit_status_counts(category_id: int = None):
+    """ステータスごとの個体数を取得"""
+    client = get_client()
+    
+    if category_id:
+        # カテゴリの機種を取得
+        types = client.table("device_types").select("id").eq("category_id", category_id).execute()
+        type_ids = [t["id"] for t in types.data]
+        
+        if not type_ids:
+            return {"in_stock": 0, "loaned": 0, "needs_attention": 0}
+        
+        # 各機種の個体を取得
+        units = client.table("device_units").select("status").in_("device_type_id", type_ids).execute()
+    else:
+        units = client.table("device_units").select("status").execute()
+    
+    counts = {"in_stock": 0, "loaned": 0, "needs_attention": 0}
+    for unit in units.data:
+        status = unit.get("status", "in_stock")
+        if status in counts:
+            counts[status] += 1
+    
+    return counts
+
+def reset_database_keep_admin():
+    """データベースをリセット（管理者のみ保持）"""
+    client = get_client()
+    
+    try:
+        # ログインユーザー以外を削除
+        users = client.table("users").select("id, email").execute()
+        for user in users.data:
+            if user["email"] != "admin@example.com":
+                client.table("users").delete().eq("id", user["id"]).execute()
+        
+        # トランザクションデータを削除
+        client.table("check_lines").delete().neq("id", 0).execute()
+        client.table("check_sessions").delete().neq("id", 0).execute()
+        client.table("issues").delete().neq("id", 0).execute()
+        client.table("returns").delete().neq("id", 0).execute()
+        client.table("loans").delete().neq("id", 0).execute()
+        client.table("unit_overrides").delete().neq("id", 0).execute()
+        client.table("device_units").delete().neq("id", 0).execute()
+        client.table("template_lines").delete().neq("id", 0).execute()
+        client.table("device_types").delete().neq("id", 0).execute()
+        client.table("items").delete().neq("id", 0).execute()
+        client.table("notification_groups").delete().neq("id", 0).execute()
+        client.table("notification_logs").delete().neq("id", 0).execute()
+        
+        # カテゴリを再シード
+        seed_categories()
+        
+        return True, "データベースをリセットしました"
+    except Exception as e:
+        return False, str(e)
+
+# マイグレーション関数（Supabaseでは不要だが互換性のため定義）
+def migrate_notifications_table():
+    pass
+
+def migrate_system_settings_table():
+    pass
+
+def migrate_phase5():
+    pass
+
+def migrate_loans_assetment_check():
+    pass
+
+def migrate_loans_notes():
+    pass
+
+def migrate_returns_assetment_check():
+    pass
+
+def migrate_returns_notes():
+    pass
+
+def migrate_returns_confirmation_check():
+    pass
