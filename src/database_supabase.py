@@ -814,7 +814,7 @@ def move_category_order(category_id: int, direction: str):
     
     return False, "これ以上移動できません"
 
-# --- SQLite互換性のためのエイリアス関数 ---
+# --- SQLite互換性のためのエイリアス・追加関数 ---
 
 def update_unit_status(unit_id: int, status: str):
     """個体のステータスを更新（SQLite互換エイリアス）"""
@@ -823,3 +823,108 @@ def update_unit_status(unit_id: int, status: str):
 def get_open_issues(device_unit_id: int):
     """オープンな問題を取得（SQLite互換エイリアス）"""
     return get_open_issues_for_unit(device_unit_id)
+
+def cancel_record(table: str, record_id: int, user_name: str, reason: str):
+    """レコードをキャンセル"""
+    client = get_client()
+    import datetime
+    
+    valid_tables = ['loans', 'returns', 'check_sessions', 'issues']
+    if table not in valid_tables:
+        raise ValueError(f"Invalid table for cancellation: {table}")
+    
+    client.table(table).update({
+        "canceled": 1,
+        "canceled_at": datetime.datetime.now().isoformat(),
+        "canceled_by": user_name,
+        "cancel_reason": reason
+    }).eq("id", record_id).execute()
+
+def get_related_records(loan_id: int = None, return_id: int = None):
+    """関連レコードを取得（キャンセル用）"""
+    client = get_client()
+    
+    res = {'returns': [], 'check_sessions': [], 'issues': []}
+    
+    if loan_id:
+        # 関連する返却を取得
+        returns = client.table("returns").select("id").eq("loan_id", loan_id).eq("canceled", 0).execute()
+        res['returns'] = [r['id'] for r in returns.data]
+        
+        # 関連するチェックセッションを取得
+        sessions = client.table("check_sessions").select("id").eq("loan_id", loan_id).eq("canceled", 0).execute()
+        res['check_sessions'] = [s['id'] for s in sessions.data]
+    
+    # 関連する問題を取得
+    if res['check_sessions']:
+        for session_id in res['check_sessions']:
+            issues = client.table("issues").select("id").eq("check_session_id", session_id).eq("status", "open").execute()
+            res['issues'].extend([i['id'] for i in issues.data])
+    
+    return res
+
+def get_loan_history(device_unit_id: int, limit: int = None, offset: int = 0, include_canceled: bool = True):
+    """貸出履歴を取得"""
+    client = get_client()
+    
+    query = client.table("loans").select("*").eq("device_unit_id", device_unit_id)
+    
+    if not include_canceled:
+        query = query.eq("canceled", 0)
+    
+    query = query.order("id", desc=True)
+    
+    if limit:
+        query = query.limit(limit).offset(offset)
+    
+    result = query.execute()
+    return result.data
+
+def get_check_session_lines(check_session_id: int):
+    """チェックセッションの行を取得"""
+    client = get_client()
+    result = client.table("check_lines").select("*, items(name, photo_path)").eq("check_session_id", check_session_id).execute()
+    
+    lines = []
+    for row in result.data:
+        item = row.get("items", {})
+        lines.append({
+            **row,
+            "item_name": item.get("name", ""),
+            "photo_path": item.get("photo_path", "")
+        })
+    return lines
+
+def get_all_check_sessions_for_loan(loan_id: int):
+    """ローンに関連する全チェックセッションを取得"""
+    client = get_client()
+    result = client.table("check_sessions").select("*").eq("loan_id", loan_id).order("id").execute()
+    return result.data
+
+def delete_unit_override(override_id: int):
+    """個体差分を削除"""
+    client = get_client()
+    client.table("unit_overrides").delete().eq("id", override_id).execute()
+
+def delete_device_type(type_id: int):
+    """機種を削除（カスケード）"""
+    client = get_client()
+    
+    # 関連する個体を取得
+    units = get_device_units(type_id)
+    
+    # 各個体を削除
+    for unit in units:
+        result = delete_device_unit(unit['id'])
+        if not result[0]:
+            return False, f"個体ID {unit['id']} の削除に失敗しました"
+    
+    try:
+        # テンプレート行を削除
+        client.table("template_lines").delete().eq("device_type_id", type_id).execute()
+        # 機種を削除
+        client.table("device_types").delete().eq("id", type_id).execute()
+        return True, "機種を削除しました"
+    except Exception as e:
+        return False, str(e)
+
