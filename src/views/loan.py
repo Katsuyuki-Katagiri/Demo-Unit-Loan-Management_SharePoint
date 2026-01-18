@@ -253,62 +253,40 @@ def render_loan_view(unit_id: int):
                 
                 if result_status == 'loaned':
                     st.markdown("""
-                    <style>
-                        @keyframes fadeInScale {
-                            0% { opacity: 0; transform: scale(0.9); }
-                            100% { opacity: 1; transform: scale(1); }
-                        }
-                        .completion-card {
-                            animation: fadeInScale 0.4s ease-out forwards;
-                        }
-                    </style>
-                    <div class="completion-card" style="
+                    <div style="
                         background: linear-gradient(135deg, #10B981 0%, #059669 100%);
                         color: white;
-                        padding: 20px 15px;
-                        border-radius: 12px;
+                        padding: 12px 10px;
+                        border-radius: 10px;
                         text-align: center;
-                        margin: 15px 0;
-                        box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+                        margin: 10px 0;
                     ">
-                        <div style="font-size: 36px; margin-bottom: 8px;">✓</div>
-                        <div style="font-size: 20px; font-weight: 700; margin-bottom: 6px;">貸出登録完了</div>
-                        <div style="font-size: 12px; opacity: 0.85;">ステータス: 貸出中</div>
+                        <div style="font-size: 28px;">✓</div>
+                        <div style="font-size: 16px; font-weight: 700;">貸出登録完了</div>
                     </div>
                     """, unsafe_allow_html=True)
                 else:
                     st.markdown("""
-                    <style>
-                        @keyframes fadeInScale {
-                            0% { opacity: 0; transform: scale(0.9); }
-                            100% { opacity: 1; transform: scale(1); }
-                        }
-                        .completion-card-warn {
-                            animation: fadeInScale 0.4s ease-out forwards;
-                        }
-                    </style>
-                    <div class="completion-card-warn" style="
+                    <div style="
                         background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
                         color: white;
-                        padding: 20px 15px;
-                        border-radius: 12px;
+                        padding: 12px 10px;
+                        border-radius: 10px;
                         text-align: center;
-                        margin: 15px 0;
-                        box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);
+                        margin: 10px 0;
                     ">
-                        <div style="font-size: 36px; margin-bottom: 8px;">!</div>
-                        <div style="font-size: 20px; font-weight: 700; margin-bottom: 6px;">登録完了</div>
-                        <div style="font-size: 12px; opacity: 0.85;">NG箇所があるため要対応</div>
+                        <div style="font-size: 28px;">!</div>
+                        <div style="font-size: 16px; font-weight: 700;">登録完了（要対応）</div>
                     </div>
                     """, unsafe_allow_html=True)
                 
                 import time
-                time.sleep(2)
+                time.sleep(1.5)
                 
                 # Clear state and go back to device type list (機種一覧)
                 st.session_state['loan_mode'] = False
                 st.session_state['selected_unit_id'] = None
-                # Keep selected_type_id to return to device type list, not home
+                st.session_state['selected_type_id'] = None  # Clear to return to 機種一覧
                 del st.session_state['checklist_data']
                 st.rerun()
                 
