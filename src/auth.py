@@ -2,9 +2,13 @@ import bcrypt
 import streamlit as st
 from src.database import get_user_by_email
 
-def check_password(password: str, hashed: bytes) -> bool:
+def check_password(password: str, hashed) -> bool:
     """Check if the provided password matches the hash."""
+    # Supabaseはpassword_hashを文字列として返すため、バイト型に変換
+    if isinstance(hashed, str):
+        hashed = hashed.encode('utf-8')
     return bcrypt.checkpw(password.encode('utf-8'), hashed)
+
 
 def login_user(email: str, password: str) -> bool:
     """
