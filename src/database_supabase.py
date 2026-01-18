@@ -813,3 +813,13 @@ def move_category_order(category_id: int, direction: str):
         return True, "順序を更新しました"
     
     return False, "これ以上移動できません"
+
+# --- SQLite互換性のためのエイリアス関数 ---
+
+def update_unit_status(unit_id: int, status: str):
+    """個体のステータスを更新（SQLite互換エイリアス）"""
+    return update_device_unit_status(unit_id, status)
+
+def get_open_issues(device_unit_id: int):
+    """オープンな問題を取得（SQLite互換エイリアス）"""
+    return get_open_issues_for_unit(device_unit_id)
