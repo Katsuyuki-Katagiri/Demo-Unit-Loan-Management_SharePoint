@@ -252,9 +252,42 @@ def render_loan_view(unit_id: int):
                 )
                 
                 if result_status == 'loaned':
-                    st.success("貸出登録完了！ (ステータス: 貸出中)")
+                    st.balloons()
+                    st.markdown("""
+                    <div style="
+                        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+                        color: white;
+                        padding: 30px;
+                        border-radius: 16px;
+                        text-align: center;
+                        margin: 20px 0;
+                        box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+                    ">
+                        <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+                        <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">貸出登録完了！</div>
+                        <div style="font-size: 16px; opacity: 0.9;">ステータス: 貸出中</div>
+                    </div>
+                    """, unsafe_allow_html=True)
                 else:
-                    st.warning("登録完了！ (NG箇所があるため、ステータスは「要対応」になりました)")
+                    st.markdown("""
+                    <div style="
+                        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+                        color: white;
+                        padding: 30px;
+                        border-radius: 16px;
+                        text-align: center;
+                        margin: 20px 0;
+                        box-shadow: 0 10px 25px rgba(245, 158, 11, 0.3);
+                    ">
+                        <div style="font-size: 48px; margin-bottom: 10px;">⚠️</div>
+                        <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">登録完了</div>
+                        <div style="font-size: 14px; opacity: 0.9;">NG箇所があるため、ステータスは「要対応」です</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Show "Back to Home" button
+                import time
+                time.sleep(2)  # Brief pause to show completion
                 
                 # Clear state
                 st.session_state['loan_mode'] = False
