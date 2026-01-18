@@ -12,7 +12,7 @@ st.set_page_config(
     page_title="デモ機管理アプリ",
     page_icon="🏥",
     layout="wide", # Phase 1: Wide layout for better tables/grids
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Apply Global Styles

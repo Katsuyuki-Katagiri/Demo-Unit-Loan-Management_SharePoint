@@ -153,5 +153,64 @@ def apply_custom_css():
             vertical-align: bottom;
             margin-right: 8px;
         }
+        
+        /* === Mobile Responsive Styles === */
+        @media screen and (max-width: 768px) {
+            /* Smaller headings on mobile */
+            h1 {
+                font-size: 1.4rem !important;
+            }
+            h2 {
+                font-size: 1.2rem !important;
+            }
+            h3 {
+                font-size: 1.0rem !important;
+            }
+            
+            /* Smaller header icon on mobile */
+            .header-icon {
+                font-size: 24px !important;
+            }
+            
+            /* Smaller title text */
+            [data-testid="stAppViewContainer"] h1 {
+                font-size: 1.3rem !important;
+                line-height: 1.3;
+            }
+            
+            /* Adjust metric cards for mobile */
+            div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+                font-size: 1.5em !important;
+            }
+            
+            /* Smaller button text */
+            div.stButton > button {
+                font-size: 0.85rem !important;
+                padding: 0.4rem 0.8rem !important;
+            }
+            
+            /* Compact expander headers */
+            div[data-testid="stExpander"] summary {
+                font-size: 0.9rem !important;
+            }
+            
+            /* General text size reduction */
+            p, span, label, div {
+                font-size: 0.9rem;
+            }
+        }
+        
+        /* Extra small screens (phones in portrait) */
+        @media screen and (max-width: 480px) {
+            h1 {
+                font-size: 1.2rem !important;
+            }
+            h2 {
+                font-size: 1.0rem !important;
+            }
+            .header-icon {
+                font-size: 20px !important;
+            }
+        }
         </style>
     """, unsafe_allow_html=True)
