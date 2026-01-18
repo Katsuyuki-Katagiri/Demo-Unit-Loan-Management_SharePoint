@@ -3,7 +3,8 @@ import os
 from src.database import (
     get_all_categories, get_device_types, get_device_units, 
     get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR,
-    get_active_loan, get_user_by_id, get_check_session_by_loan_id
+    get_active_loan, get_user_by_id, get_check_session_by_loan_id,
+    get_category_by_id
 )
 
 from src.logic import get_synthesized_checklist, get_image_base64
@@ -379,6 +380,12 @@ def render_home_view():
     # --- Level 1: Device Types List ---
     elif st.session_state.get('selected_category_id'):
         cat_id = st.session_state['selected_category_id']
+        category = get_category_by_id(cat_id)
+        
+        if category:
+            st.title(category['name'])
+            if 'description' in category.keys() and category['description']:
+                st.caption(category['description'])
         
         # --- Dashboard Summary (Category Specific) ---
         from src.database import get_unit_status_counts
@@ -467,15 +474,79 @@ def render_home_view():
         categories = get_all_categories()
         
         # Filter visible only
-        # sqlite3.Row does not support .get(), so we check keys or assume existence
         visible_cats = [c for c in categories if (c['is_visible'] if 'is_visible' in c.keys() else 1) == 1]
         
         # Grid layout
         cols = st.columns(3)
+        
+        # CSS for Button-as-Card
+        st.markdown("""
+        <style>
+        /* Target ONLY buttons in Main area (exclude sidebar) and exclude Primary buttons */
+        section[data-testid="stMain"] div.stButton > button:not([kind="primary"]) {
+            width: 100%;
+            height: auto;
+            min-height: 80px;
+            white-space: pre-wrap !important;
+            text-align: center;
+            border: 1px solid rgba(49, 51, 63, 0.2);
+            background-color: white;
+            color: #666; /* Base color (Description) */
+            padding: 8px 4px;
+            line-height: 1.25;
+            transition: all 0.2s;
+        }
+        section[data-testid="stMain"] div.stButton > button:not([kind="primary"]):hover {
+            border-color: #ff4b4b;
+            background-color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        section[data-testid="stMain"] div.stButton > button:not([kind="primary"]):focus {
+            box-shadow: none;
+            outline: none;
+        }
+        
+        /* Typography: Title vs Description */
+        section[data-testid="stMain"] div.stButton > button:not([kind="primary"]) p {
+            font-size: 0.8rem !important; /* Description Size */
+            margin: 0px !important;
+        }
+        section[data-testid="stMain"] div.stButton > button:not([kind="primary"]) p::first-line {
+            font-size: 1.15rem !important; /* Title Size */
+            font-weight: bold;
+            color: #31333F;
+            line-height: 1.6;
+        }
+
+        /* Dark mode adjustments */
+        @media (prefers-color-scheme: dark) {
+            section[data-testid="stMain"] div.stButton > button:not([kind="primary"]) {
+                background-color: #262730;
+                color: #AAAAAA;
+                border: 1px solid rgba(250, 250, 250, 0.2);
+            }
+            section[data-testid="stMain"] div.stButton > button:not([kind="primary"]):hover {
+                border-color: #ff4b4b;
+                color: #ff4b4b;
+                background-color: #262730;
+            }
+            section[data-testid="stMain"] div.stButton > button:not([kind="primary"]) p::first-line {
+                color: #FAFAFA;
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
         for i, cat in enumerate(visible_cats):
             col = cols[i % 3]
             with col:
-                # Big Button Style
-                if st.button(cat['name'], key=f"cat_{cat['id']}", use_container_width=True):
+                desc_text = cat['description'] if 'description' in cat.keys() and cat['description'] else " "
+                
+                # Label: Name (Line 1) + Description (Line 2)
+                # No markdown stars, relying on CSS ::first-line
+                label = f"{cat['name']}\n{desc_text}"
+                
+                if st.button(label, key=f"cat_btn_{cat['id']}", use_container_width=True):
                     st.session_state['selected_category_id'] = cat['id']
                     st.rerun()

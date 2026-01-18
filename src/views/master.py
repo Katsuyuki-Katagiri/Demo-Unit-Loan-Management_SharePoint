@@ -32,7 +32,8 @@ def render_master_view():
         
         from src.database import (
             update_category_visibility, create_category, 
-            update_category_name, delete_category
+            update_category_name, delete_category, update_category_basic_info,
+            move_category_order
         )
         
         # Prepare department options for dropdown
@@ -67,28 +68,56 @@ def render_master_view():
                 is_vis = bool(cat['is_visible']) if 'is_visible' in cat.keys() and cat['is_visible'] is not None else True
                 
                 with st.container(border=True):
-                    row1_c1, row1_c2, row1_c3, row1_c4 = st.columns([3, 1.5, 1.5, 0.5])
+                    # Adjusted columns: Name(3), Up(0.5), Down(0.5), UpdateBtn(1), Visible(1), Delete(0.5)
+                    # We need compact columns for arrows
+                    row1_c1, row1_c2, row1_c3, row1_c4, row1_c5, row1_c6 = st.columns([3, 0.4, 0.4, 0.8, 1, 0.5])
                     
                     # 1. Edit Name
                     new_name_input = row1_c1.text_input("名称", value=cat['name'], key=f"cat_name_{cat['id']}", label_visibility="collapsed")
                     
-                    # 2. Update Name Button
-                    if row1_c2.button("名称変更", key=f"ren_cat_{cat['id']}"):
-                        if new_name_input and new_name_input != cat['name']:
-                            if update_category_name(cat['id'], new_name_input):
+                    # 2. Sort Buttons
+                    if row1_c2.button("↑", key=f"mv_up_{cat['id']}", help="上に移動"):
+                        success, msg = move_category_order(cat['id'], 'up')
+                        if success:
+                            st.cache_data.clear()
+                            st.rerun()
+                            
+                    if row1_c3.button("↓", key=f"mv_down_{cat['id']}", help="下に移動"):
+                        success, msg = move_category_order(cat['id'], 'down')
+                        if success:
+                            st.cache_data.clear()
+                            st.rerun()
+
+                    # Description (Full width below)
+                    current_desc = cat['description'] if 'description' in cat.keys() and cat['description'] else ""
+                    new_desc_input = st.text_area("補足説明", value=current_desc, key=f"cat_desc_{cat['id']}", height=68, placeholder="補足説明を入力...")
+
+                    # 3. Update Button (Name & Description only now, sort is handled by buttons)
+                    if row1_c4.button("更新", key=f"upd_cat_{cat['id']}", help="保存"):
+                        if new_name_input:
+                            # Pass 0 or current sort for sort_order arg? 
+                            # Since we don't edit sort order here, we can just pass current or ignore if we update function to be optional
+                            # Re-using update_category_basic_info requires 4 args. 
+                            # Let's pass the current sort_order to avoid overwriting it accidentally, though move_category handles it mostly.
+                            current_sort = cat['sort_order'] if 'sort_order' in cat.keys() else 0
+                            if update_category_basic_info(cat['id'], new_name_input, new_desc_input, current_sort):
                                 st.cache_data.clear()
-                                st.success("変更しました")
+                                st.success("更新しました")
                                 st.rerun()
+                            else:
+                                st.error("更新失敗")
+                        else:
+                            st.warning("名称は必須です")
                     
-                    # 3. Visibility Toggle
-                    current_toggle = row1_c3.toggle("表示", value=is_vis, key=f"cat_vis_{cat['id']}")
+                    # 4. Visibility (Toggle)
+                    current_toggle = row1_c5.toggle("表示", value=is_vis, key=f"cat_vis_{cat['id']}")
                     if current_toggle != is_vis:
                          update_category_visibility(cat['id'], current_toggle)
                          st.cache_data.clear()
                          st.rerun()
 
-                    # 4. Delete Button
-                    if row1_c4.button("🗑️", key=f"del_cat_{cat['id']}", help="削除"):
+                    # 5. Delete Button
+                    if row1_c6.button("🗑️", key=f"del_cat_{cat['id']}", help="削除"):
                          success, msg = delete_category(cat['id'])
                          if success:
                              st.cache_data.clear()

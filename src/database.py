@@ -241,6 +241,8 @@ def init_db():
     # Run migrations
     migrate_user_department()
     migrate_category_managing_department()
+    migrate_category_description()
+    migrate_category_sort_order()
     
     migrate_dates()
 
@@ -360,7 +362,13 @@ def get_all_categories():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT * FROM categories")
+    # Check if sort_order exists, otherwise basic select
+    # Or just assume migration ran.
+    try:
+        c.execute("SELECT * FROM categories ORDER BY sort_order ASC, id ASC")
+    except:
+        c.execute("SELECT * FROM categories")
+        
     res = [dict(row) for row in c.fetchall()]
     conn.close()
     return res
@@ -414,6 +422,38 @@ def migrate_category_managing_department():
     finally:
         conn.close()
 
+def migrate_category_description():
+    """Migrate categories table to include description column."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(categories)")
+        columns = [r[1] for r in c.fetchall()]
+        if 'description' not in columns:
+            print("Migrating categories: adding description column...")
+            c.execute("ALTER TABLE categories ADD COLUMN description TEXT")
+            conn.commit()
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        conn.close()
+
+def migrate_category_sort_order():
+    """Migrate categories table to include sort_order column."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(categories)")
+        columns = [r[1] for r in c.fetchall()]
+        if 'sort_order' not in columns:
+            print("Migrating categories: adding sort_order column...")
+            c.execute("ALTER TABLE categories ADD COLUMN sort_order INTEGER DEFAULT 0")
+            conn.commit()
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        conn.close()
+
 
 def update_category_visibility(category_id: int, is_visible: bool):
     """Update visibility status of a category."""
@@ -427,6 +467,60 @@ def update_category_visibility(category_id: int, is_visible: bool):
     except Exception as e:
         print(e)
         return False
+    finally:
+        conn.close()
+
+
+
+def move_category_order(category_id: int, direction: str):
+    """
+    Move a category up or down in the sort order.
+    direction: 'up' or 'down'
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    try:
+        # 1. Get all categories sorted by current sort_order, then ID
+        c.execute("SELECT id, sort_order FROM categories ORDER BY sort_order ASC, id ASC")
+        categories = [dict(r) for r in c.fetchall()]
+        
+        # 2. Find index of target
+        idx = -1
+        for i, cat in enumerate(categories):
+            if cat['id'] == category_id:
+                idx = i
+                break
+        
+        if idx == -1:
+            return False, "Category not found"
+        
+        # 3. Determine swap target
+        swap_idx = -1
+        if direction == 'up':
+            if idx > 0:
+                swap_idx = idx - 1
+        elif direction == 'down':
+            if idx < len(categories) - 1:
+                swap_idx = idx + 1
+        
+        if swap_idx != -1:
+            # Swap in the list
+            categories[idx], categories[swap_idx] = categories[swap_idx], categories[idx]
+            
+            # 4. Re-assign sort orders for ALL to normalize (spaced by 10)
+            for i, cat in enumerate(categories):
+                new_order = (i + 1) * 10
+                c.execute("UPDATE categories SET sort_order = ? WHERE id = ?", (new_order, cat['id']))
+            
+            conn.commit()
+            return True, "順序を更新しました"
+        else:
+            return False, "これ以上移動できません"
+
+    except Exception as e:
+        print(e)
+        return False, str(e)
     finally:
         conn.close()
 
@@ -445,12 +539,12 @@ def create_category(name: str):
     finally:
         conn.close()
 
-def update_category_name(category_id: int, new_name: str):
-    """Update the name of a category."""
+def update_category_basic_info(category_id: int, new_name: str, description: str, sort_order: int = 0):
+    """Update the name, description and sort_order of a category."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
-        c.execute("UPDATE categories SET name = ? WHERE id = ?", (new_name, category_id))
+        c.execute("UPDATE categories SET name = ?, description = ?, sort_order = ? WHERE id = ?", (new_name, description, sort_order, category_id))
         conn.commit()
         return True
     except Exception as e:
@@ -458,6 +552,23 @@ def update_category_name(category_id: int, new_name: str):
         return False
     finally:
         conn.close()
+
+def update_category_name(category_id: int, new_name: str):
+    """Update the name of a category. (Legacy wrapper)"""
+    # Fetch description to keep it
+    cat = get_category_by_id(category_id)
+    desc = cat['description'] if cat and 'description' in cat.keys() else ""
+    order = cat['sort_order'] if cat and 'sort_order' in cat.keys() else 0
+    return update_category_basic_info(category_id, new_name, desc, order)
+
+def get_category_by_id(category_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM categories WHERE id = ?", (category_id,))
+    res = c.fetchone()
+    conn.close()
+    return res
 
 def delete_category(category_id: int):
     """Delete a category if it has no associated device types."""
