@@ -236,9 +236,13 @@ def apply_custom_css():
         </style>
     """, unsafe_allow_html=True)
     
-    # Scroll to top on page load
-    st.markdown("""
+    # Scroll to top using components.html (more reliable JS execution)
+    import streamlit.components.v1 as components
+    components.html(
+        """
         <script>
-            window.scrollTo(0, 0);
+            window.parent.document.querySelector('section.main').scrollTo(0, 0);
         </script>
-    """, unsafe_allow_html=True)
+        """,
+        height=0,
+    )
