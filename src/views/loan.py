@@ -252,36 +252,60 @@ def render_loan_view(unit_id: int):
                 )
                 
                 if result_status == 'loaned':
-                    st.balloons()
                     st.markdown("""
-                    <div style="
+                    <style>
+                        @keyframes fadeInScale {
+                            0% { opacity: 0; transform: scale(0.8); }
+                            100% { opacity: 1; transform: scale(1); }
+                        }
+                        @keyframes checkPulse {
+                            0%, 100% { transform: scale(1); }
+                            50% { transform: scale(1.1); }
+                        }
+                        .completion-card {
+                            animation: fadeInScale 0.5s ease-out forwards;
+                        }
+                        .completion-icon {
+                            animation: checkPulse 1s ease-in-out 2;
+                        }
+                    </style>
+                    <div class="completion-card" style="
                         background: linear-gradient(135deg, #10B981 0%, #059669 100%);
                         color: white;
-                        padding: 30px;
+                        padding: 40px 30px;
                         border-radius: 16px;
                         text-align: center;
-                        margin: 20px 0;
-                        box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+                        margin: 30px 0;
+                        box-shadow: 0 15px 35px rgba(16, 185, 129, 0.35);
                     ">
-                        <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
-                        <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">貸出登録完了！</div>
-                        <div style="font-size: 16px; opacity: 0.9;">ステータス: 貸出中</div>
+                        <div class="completion-icon" style="font-size: 56px; margin-bottom: 15px;">✓</div>
+                        <div style="font-size: 26px; font-weight: 700; margin-bottom: 12px; letter-spacing: 1px;">貸出登録完了</div>
+                        <div style="font-size: 14px; opacity: 0.85; font-weight: 300;">ステータス: 貸出中</div>
                     </div>
                     """, unsafe_allow_html=True)
                 else:
                     st.markdown("""
-                    <div style="
+                    <style>
+                        @keyframes fadeInScale {
+                            0% { opacity: 0; transform: scale(0.8); }
+                            100% { opacity: 1; transform: scale(1); }
+                        }
+                        .completion-card-warn {
+                            animation: fadeInScale 0.5s ease-out forwards;
+                        }
+                    </style>
+                    <div class="completion-card-warn" style="
                         background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
                         color: white;
-                        padding: 30px;
+                        padding: 40px 30px;
                         border-radius: 16px;
                         text-align: center;
-                        margin: 20px 0;
-                        box-shadow: 0 10px 25px rgba(245, 158, 11, 0.3);
+                        margin: 30px 0;
+                        box-shadow: 0 15px 35px rgba(245, 158, 11, 0.35);
                     ">
-                        <div style="font-size: 48px; margin-bottom: 10px;">⚠️</div>
-                        <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">登録完了</div>
-                        <div style="font-size: 14px; opacity: 0.9;">NG箇所があるため、ステータスは「要対応」です</div>
+                        <div style="font-size: 56px; margin-bottom: 15px;">!</div>
+                        <div style="font-size: 26px; font-weight: 700; margin-bottom: 12px; letter-spacing: 1px;">登録完了</div>
+                        <div style="font-size: 14px; opacity: 0.85; font-weight: 300;">NG箇所があるため、ステータスは「要対応」です</div>
                     </div>
                     """, unsafe_allow_html=True)
                 
