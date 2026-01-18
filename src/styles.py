@@ -235,3 +235,10 @@ def apply_custom_css():
         }
         </style>
     """, unsafe_allow_html=True)
+    
+    # Scroll to top on page load
+    st.markdown("""
+        <script>
+            window.scrollTo(0, 0);
+        </script>
+    """, unsafe_allow_html=True)
