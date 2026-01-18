@@ -210,10 +210,7 @@ def render_return_view(unit_id: int):
                         st.error(f"ファイルサイズが大きすぎます: {uf.name} (上限5MB)")
                         st.stop()
             
-            if camera_image:
-                if camera_image.size > 5 * 1024 * 1024:
-                    st.error("カメラ撮影画像のサイズが大きすぎます (上限5MB)")
-                    st.stop()
+            
 
             # 1. Save Photos
             timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
