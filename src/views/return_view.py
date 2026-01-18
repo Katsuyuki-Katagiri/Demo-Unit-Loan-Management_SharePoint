@@ -286,66 +286,60 @@ def render_return_view(unit_id: int):
                     st.markdown("""
                     <style>
                         @keyframes fadeInScale {
-                            0% { opacity: 0; transform: scale(0.8); }
+                            0% { opacity: 0; transform: scale(0.9); }
                             100% { opacity: 1; transform: scale(1); }
                         }
-                        @keyframes checkPulse {
-                            0%, 100% { transform: scale(1); }
-                            50% { transform: scale(1.1); }
-                        }
                         .completion-card {
-                            animation: fadeInScale 0.5s ease-out forwards;
-                        }
-                        .completion-icon {
-                            animation: checkPulse 1s ease-in-out 2;
+                            animation: fadeInScale 0.4s ease-out forwards;
                         }
                     </style>
                     <div class="completion-card" style="
                         background: linear-gradient(135deg, #10B981 0%, #059669 100%);
                         color: white;
-                        padding: 40px 30px;
-                        border-radius: 16px;
+                        padding: 20px 15px;
+                        border-radius: 12px;
                         text-align: center;
-                        margin: 30px 0;
-                        box-shadow: 0 15px 35px rgba(16, 185, 129, 0.35);
+                        margin: 15px 0;
+                        box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
                     ">
-                        <div class="completion-icon" style="font-size: 56px; margin-bottom: 15px;">✓</div>
-                        <div style="font-size: 26px; font-weight: 700; margin-bottom: 12px; letter-spacing: 1px;">返却登録完了</div>
-                        <div style="font-size: 14px; opacity: 0.85; font-weight: 300;">ステータス: 在庫あり</div>
+                        <div style="font-size: 36px; margin-bottom: 8px;">✓</div>
+                        <div style="font-size: 20px; font-weight: 700; margin-bottom: 6px;">返却登録完了</div>
+                        <div style="font-size: 12px; opacity: 0.85;">ステータス: 在庫あり</div>
                     </div>
                     """, unsafe_allow_html=True)
                 else:
                     st.markdown("""
                     <style>
                         @keyframes fadeInScale {
-                            0% { opacity: 0; transform: scale(0.8); }
+                            0% { opacity: 0; transform: scale(0.9); }
                             100% { opacity: 1; transform: scale(1); }
                         }
                         .completion-card-warn {
-                            animation: fadeInScale 0.5s ease-out forwards;
+                            animation: fadeInScale 0.4s ease-out forwards;
                         }
                     </style>
                     <div class="completion-card-warn" style="
                         background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
                         color: white;
-                        padding: 40px 30px;
-                        border-radius: 16px;
+                        padding: 20px 15px;
+                        border-radius: 12px;
                         text-align: center;
-                        margin: 30px 0;
-                        box-shadow: 0 15px 35px rgba(245, 158, 11, 0.35);
+                        margin: 15px 0;
+                        box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);
                     ">
-                        <div style="font-size: 56px; margin-bottom: 15px;">!</div>
-                        <div style="font-size: 26px; font-weight: 700; margin-bottom: 12px; letter-spacing: 1px;">登録完了</div>
-                        <div style="font-size: 14px; opacity: 0.85; font-weight: 300;">NG箇所または未解決のIssueがあるため、<br>ステータスは「要対応」です</div>
+                        <div style="font-size: 36px; margin-bottom: 8px;">!</div>
+                        <div style="font-size: 20px; font-weight: 700; margin-bottom: 6px;">登録完了</div>
+                        <div style="font-size: 12px; opacity: 0.85;">NG/未解決Issueのため要対応</div>
                     </div>
                     """, unsafe_allow_html=True)
                 
-                # Brief pause to show completion
                 import time
                 time.sleep(2)
                 
-                # Clear state
+                # Clear state and go back to device type list (機種一覧)
                 st.session_state['return_mode'] = False
+                st.session_state['selected_unit_id'] = None
+                # Keep selected_type_id to return to device type list, not home
                 del st.session_state['return_checklist_data']
                 st.rerun()
                 
