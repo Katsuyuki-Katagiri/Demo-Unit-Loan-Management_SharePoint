@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS loans (
     checker_user_id INTEGER,
     status TEXT DEFAULT 'open',
     notes TEXT,
+    assetment_checked BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT NOW(),
     canceled INTEGER DEFAULT 0,
     canceled_at TIMESTAMP,
