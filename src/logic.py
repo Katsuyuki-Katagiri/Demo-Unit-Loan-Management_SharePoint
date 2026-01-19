@@ -404,14 +404,27 @@ def process_return(
     loan_id = active_loan['id']
 
     # 2. Create Return (Closes Loan)
-    create_return(
-        loan_id=loan_id,
-        return_date=return_date,
-        checker_user_id=user_id,
-        assetment_returned=assetment_returned,
-        notes=notes,
-        confirmation_checked=confirmation_checked
-    )
+    try:
+        create_return(
+            loan_id=loan_id,
+            return_date=return_date,
+            checker_user_id=user_id,
+            assetment_returned=assetment_returned,
+            notes=notes,
+            confirmation_checked=confirmation_checked
+        )
+    except Exception as e:
+        st.error(f"Error in create_return: {e}")
+        # APIErrorなどの詳細属性があれば表示
+        if hasattr(e, 'details'):
+            st.write(f"Details: {e.details}")
+        if hasattr(e, 'hint'):
+            st.write(f"Hint: {e.hint}")
+        if hasattr(e, 'message'):
+            st.write(f"Message: {e.message}")
+        import traceback
+        st.code(traceback.format_exc())
+        raise e
     
     # 3. Create Check Session
     session_id = create_check_session(
