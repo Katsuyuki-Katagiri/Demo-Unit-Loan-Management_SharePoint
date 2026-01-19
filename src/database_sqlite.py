@@ -1161,15 +1161,6 @@ def get_active_loan(device_unit_id: int):
     conn.close()
     return res
 
-def get_check_session_by_loan_id(loan_id: int, session_type: str = 'checkout'):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT * FROM check_sessions WHERE loan_id = ? AND session_type = ? LIMIT 1", (loan_id, session_type))
-    res = c.fetchone()
-    conn.close()
-    return res
-
 def get_all_check_sessions_for_loan(loan_id: int):
     """Get ALL check sessions related to a loan (checkout, return, etc.)."""
     conn = sqlite3.connect(DB_PATH)
@@ -1181,6 +1172,26 @@ def get_all_check_sessions_for_loan(loan_id: int):
         ORDER BY id ASC
     """, (loan_id,))
     res = c.fetchall()
+    conn.close()
+    return res
+
+def create_check_line(check_session_id: int, item_id: int, required_qty: int, result: str, ng_reason: str = None, found_qty: int = None, comment: str = None):
+    """チェック明細を作成"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO check_lines (check_session_id, item_id, required_qty, result, ng_reason, found_qty, comment)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (check_session_id, item_id, required_qty, result, ng_reason, found_qty, comment))
+    conn.commit()
+    conn.close()
+
+def get_check_session_by_loan_id(loan_id: int, session_type: str = 'checkout'):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM check_sessions WHERE loan_id = ? AND session_type = ? LIMIT 1", (loan_id, session_type))
+    res = c.fetchone()
     conn.close()
     return res
 

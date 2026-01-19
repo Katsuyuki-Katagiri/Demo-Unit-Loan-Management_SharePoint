@@ -630,6 +630,24 @@ def create_check_session(session_type: str, device_unit_id: int, loan_id: int = 
         return result.data[0]["id"]
     return None
 
+def create_check_line(check_session_id: int, item_id: int, required_qty: int, result: str, ng_reason: str = None, found_qty: int = None, comment: str = None):
+    """チェック明細を作成"""
+    client = get_client()
+    data = {
+        "check_session_id": check_session_id,
+        "item_id": item_id,
+        "required_qty": required_qty,
+        "result": result
+    }
+    if ng_reason:
+        data["ng_reason"] = ng_reason
+    if found_qty is not None:
+        data["found_qty"] = found_qty
+    if comment:
+        data["comment"] = comment
+        
+    client.table("check_lines").insert(data).execute()
+
 def get_check_session_by_loan_id(loan_id: int):
     """貸出IDでチェックセッションを取得"""
     client = get_client()
