@@ -443,14 +443,15 @@ def process_return(
         if is_ng:
             has_ng = True
             
+        # キーワード引数でのTypeError回避のため位置引数を使用
         create_check_line(
-            check_session_id=session_id,
-            item_id=res['item_id'],
-            required_qty=res['required_qty'],
-            result=res['result'],
-            ng_reason=res.get('ng_reason'),
-            found_qty=res.get('found_qty'),
-            comment=res.get('comment')
+            session_id,
+            res['item_id'],
+            res['required_qty'],
+            res['result'],
+            res.get('ng_reason'),
+            res.get('found_qty'),
+            res.get('comment')
         )
         
         if is_ng:
