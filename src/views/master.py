@@ -357,7 +357,7 @@ def render_master_view():
                 else:
                     st.info("構成品が登録されていません。")
                 
-                with st.expander("構成品を追加/編集 （※希望する構成品がない場合は「構成品マスタ」タブから構成品を追加してください）"):
+                with st.expander("構成品を追加/編集\n（※希望する構成品がない場合は「構成品マスタ」タブから構成品を追加してください）"):
                     with st.form("add_tpl_line"):
                         all_items = get_all_items()
                         item_opts = {f"{i['name']}": i['id'] for i in all_items}
