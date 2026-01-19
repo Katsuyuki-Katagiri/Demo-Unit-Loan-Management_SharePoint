@@ -184,14 +184,15 @@ def process_loan(
             has_ng = True
             
         try:
+            # キーワード引数でエラーが出るため、位置引数に変更して回避
             create_check_line(
-                check_session_id=session_id,
-                item_id=res['item_id'],
-                required_qty=res['required_qty'],
-                result=res['result'],
-                ng_reason=res.get('ng_reason'),
-                found_qty=res.get('found_qty'),
-                comment=res.get('comment')
+                session_id,
+                res['item_id'],
+                res['required_qty'],
+                res['result'],
+                res.get('ng_reason'),
+                res.get('found_qty'),
+                res.get('comment')
             )
         except TypeError as e:
             import traceback
