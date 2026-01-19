@@ -680,9 +680,9 @@ def create_department(name: str):
     client = get_client()
     try:
         client.table("departments").insert({"name": name}).execute()
-        return True
-    except Exception:
-        return False
+        return True, "部署を作成しました"
+    except Exception as e:
+        return False, f"作成に失敗しました: {str(e)}"
 
 # --- Synthesized Checklist (Logic) ---
 
