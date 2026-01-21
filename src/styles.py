@@ -254,7 +254,7 @@ def apply_custom_css():
 
                 // モバイルでサイドバーを確実に閉じるためのポーリング処理
                 var checkCount = 0;
-                var maxChecks = 15; // 300ms * 15 = 4.5秒間監視
+                var maxChecks = 50; // 300ms * 50 = 15秒間監視
                 
                 var sidebarChecker = setInterval(function() {
                     checkCount++;
@@ -263,29 +263,41 @@ def apply_custom_css():
                         return;
                     }
 
-                    // モバイル判定 (幅768px以下)
+                    // モバイル判定 (幅998px以下に緩和 - タブレットや大型スマホ対応)
                     var width = window.parent.innerWidth || window.innerWidth;
-                    if (width <= 768) {
+                    if (width <= 998) {
                         var doc = window.parent.document;
                         
                         // サイドバーの状態を確認
                         var sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-                        if (sidebar && sidebar.getAttribute('aria-expanded') === 'true') {
-                            // 閉じボタンを探してクリック
-                            var closeBtn = doc.querySelector('section[data-testid="stSidebar"] button[aria-label="Close sidebar"]');
+                        var isExpanded = sidebar && (sidebar.getAttribute('aria-expanded') === 'true' || sidebar.style.width === '336px');
+                        
+                        if (isExpanded) {
+                            // 閉じボタンを探してクリック（セレクタをさらに追加）
+                            var closeButtons = [
+                                'button[aria-label="Close sidebar"]',
+                                'section[data-testid="stSidebar"] button[kind="header"]',
+                                '[data-testid="stSidebarCollapseButton"]',
+                                '[data-testid="collapsedControl"] button',
+                                'button[data-testid="baseButton-header"]' // 新しいStreamlitバージョンの可能性
+                            ];
                             
-                            // Streamlitのバージョンによってセレクタが異なる場合への対応
-                            if (!closeBtn) {
-                                closeBtn = doc.querySelector('section[data-testid="stSidebar"] button[kind="header"]');
-                            }
-                            if (!closeBtn) {
-                                closeBtn = doc.querySelector('[data-testid="stSidebarCollapseButton"]');
+                            var clicked = false;
+                            for (var i = 0; i < closeButtons.length; i++) {
+                                var btn = doc.querySelector(closeButtons[i]);
+                                if (btn) {
+                                    btn.click();
+                                    clicked = true;
+                                    break;
+                                }
                             }
                             
-                            if (closeBtn) {
-                                closeBtn.click();
-                                // 成功したらループ終了（あるいは念のためもう一度確認するなら終了しない）
-                                // clearInterval(sidebarChecker); 
+                            // ボタンが見つからない場合のフォールバック：データ属性を強制書き換え
+                            if (!clicked && sidebar) {
+                                sidebar.setAttribute('aria-expanded', 'false');
+                                // 無理やり閉じた状態にするのは描画崩れの恐れがあるため、
+                                // ボタンクリックが最優先だが、やむを得ない場合はスタイル調整
+                                // sidebar.style.display = 'none'; // これは危険なのでやらない
                             }
                         }
                     } else {
