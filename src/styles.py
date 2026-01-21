@@ -138,6 +138,20 @@ def apply_custom_css():
             background-color: #F8FAFC;
             border-right: 1px solid #E5E7EB;
         }
+        
+        /* モバイルでの初期ロード時にサイドバーを一瞬隠すハック */
+        @keyframes initSidebarMobile {
+            0% { transform: translateX(-100%); opacity: 0; }
+            80% { transform: translateX(-100%); opacity: 0; }
+            100% { transform: translateX(0); opacity: 1; }
+        }
+        
+        @media screen and (max-width: 998px) {
+            section[data-testid="stSidebar"] {
+                /* 起動直後の1秒間だけ強制的に隠す（JSが動くまでのつなぎ） */
+                animation: initSidebarMobile 1s ease-out forwards;
+            }
+        }
 
         /* Custom utility classes */
         .card {
@@ -241,20 +255,23 @@ def apply_custom_css():
     components.html(
         """
         <script>
+            // ブラウザが記憶しているサイドバーの状態を強制的に閉じるに設定
+            try {
+                window.parent.localStorage.setItem("sidebarState", "collapsed");
+            } catch (e) {
+                console.error("Failed to access localStorage");
+            }
+
             // Delayed execution to ensure page is fully rendered
             setTimeout(function() {
                 // Scroll to top
                 try {
                     window.parent.scrollTo(0, 0);
-                    var mainSection = window.parent.document.querySelector('section.main');
-                    if (mainSection) mainSection.scrollTo(0, 0);
-                    var appViewContainer = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
-                    if (appViewContainer) appViewContainer.scrollTo(0, 0);
-                } catch (e) { console.error(e); }
+                } catch (e) {}
 
                 // モバイルでサイドバーを確実に閉じるためのポーリング処理
                 var checkCount = 0;
-                var maxChecks = 50; // 300ms * 50 = 15秒間監視
+                var maxChecks = 50; // 15秒間監視
                 
                 var sidebarChecker = setInterval(function() {
                     checkCount++;
@@ -263,7 +280,7 @@ def apply_custom_css():
                         return;
                     }
 
-                    // モバイル判定 (幅998px以下に緩和 - タブレットや大型スマホ対応)
+                    // モバイル判定 (幅998px以下に緩和)
                     var width = window.parent.innerWidth || window.innerWidth;
                     if (width <= 998) {
                         var doc = window.parent.document;
@@ -273,13 +290,12 @@ def apply_custom_css():
                         var isExpanded = sidebar && (sidebar.getAttribute('aria-expanded') === 'true' || sidebar.style.width === '336px');
                         
                         if (isExpanded) {
-                            // 閉じボタンを探してクリック（セレクタをさらに追加）
+                            // 閉じボタンを探してクリック
                             var closeButtons = [
                                 'button[aria-label="Close sidebar"]',
                                 'section[data-testid="stSidebar"] button[kind="header"]',
                                 '[data-testid="stSidebarCollapseButton"]',
-                                '[data-testid="collapsedControl"] button',
-                                'button[data-testid="baseButton-header"]' // 新しいStreamlitバージョンの可能性
+                                '[data-testid="collapsedControl"] button'
                             ];
                             
                             var clicked = false;
@@ -291,17 +307,8 @@ def apply_custom_css():
                                     break;
                                 }
                             }
-                            
-                            // ボタンが見つからない場合のフォールバック：データ属性を強制書き換え
-                            if (!clicked && sidebar) {
-                                sidebar.setAttribute('aria-expanded', 'false');
-                                // 無理やり閉じた状態にするのは描画崩れの恐れがあるため、
-                                // ボタンクリックが最優先だが、やむを得ない場合はスタイル調整
-                                // sidebar.style.display = 'none'; // これは危険なのでやらない
-                            }
                         }
                     } else {
-                        // PCサイズなら何もしないで終了
                         clearInterval(sidebarChecker);
                     }
                 }, 300);
