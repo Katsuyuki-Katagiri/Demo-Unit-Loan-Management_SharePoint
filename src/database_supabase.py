@@ -566,7 +566,12 @@ def update_device_unit(unit_id: int, lot_number: str, mfg_date: str, location: s
 def update_device_unit_status(unit_id: int, status: str):
     """個体のステータスを更新"""
     client = get_client()
-    client.table("device_units").update({"status": status}).eq("id", unit_id).execute()
+    try:
+        client.table("device_units").update({"status": status}).eq("id", unit_id).execute()
+        return True
+    except Exception as e:
+        print(f"Error updating unit status: {e}")
+        return False
 
 def delete_device_unit(unit_id: int):
     """個体を削除（カスケード）"""
