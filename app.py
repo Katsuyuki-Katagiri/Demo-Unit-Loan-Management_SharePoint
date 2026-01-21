@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-from src.database import init_db, check_users_exist, seed_categories
+from src.database import init_db, check_users_exist, seed_categories, update_user_password, get_user_by_id
 from src.auth import is_logged_in, logout_user
 from src.views.setup import render_setup_view
 from src.views.login import render_login_view
@@ -41,7 +41,6 @@ if 'db_initialized' not in st.session_state:
 
 def _render_password_change_dialog():
     """パスワード変更ダイアログを表示"""
-    from src.database import update_user_password, get_user_by_id
     from src.auth import check_password
     
     @st.dialog("🔑 パスワード変更")

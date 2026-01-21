@@ -17,6 +17,10 @@ except Exception:
 if _use_supabase:
     # Supabase版を使用
     from src.database_supabase import *
+    # 明示的にエクスポート（一部の環境でワイルドカードインポートが機能しない場合の対策）
+    from src.database_supabase import update_user_password, get_user_by_id
 else:
     # SQLite版を使用
     from src.database_sqlite import *
+    # 明示的にエクスポート（一部の環境でワイルドカードインポートが機能しない場合の対策）
+    from src.database_sqlite import update_user_password, get_user_by_id
