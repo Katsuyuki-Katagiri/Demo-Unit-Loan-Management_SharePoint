@@ -7,7 +7,8 @@ from src.database import (
     save_system_setting, get_system_setting,
     get_notification_logs, create_user, delete_user, check_email_exists,
     get_all_departments, create_department, update_department, delete_department,
-    get_users_by_department, update_user_department, get_department_by_id
+    get_users_by_department, update_user_department, get_department_by_id,
+    update_user_password
 )
 
 def render_settings_view():
@@ -144,6 +145,10 @@ def render_settings_view():
     with tab3:
         st.header("ユーザー管理")
         st.caption("システムにログインできるユーザーを追加・削除します。")
+        
+        # パスワードリセットダイアログを表示（セッション状態で制御）
+        _render_password_reset_dialog()
+
 
         # Get departments for dropdown
         departments = get_all_departments()
@@ -318,7 +323,7 @@ def render_settings_view():
 def _render_user_row(u, dept_options_with_none):
     """Render a single user row with department selection and delete button."""
     with st.container(border=True):
-        c1, c2, c3, c4 = st.columns([2, 1.5, 1, 0.5])
+        c1, c2, c3, c4, c5 = st.columns([2, 1.5, 1, 0.5, 0.5])
         role_badge = "👑 管理者" if u['role'] == 'admin' else "👤 一般" if u['role'] == 'user' else "🏢 関連業者"
         c1.markdown(f"**{u['name']}** ({u['email']})")
         c2.caption(role_badge)
@@ -344,8 +349,14 @@ def _render_user_row(u, dept_options_with_none):
             update_user_department(u['id'], new_dept_id)
             st.rerun()
         
+        # Password reset button
+        if c4.button("🔑", key=f"reset_pwd_{u['id']}", help="パスワードリセット"):
+            st.session_state['reset_password_user_id'] = u['id']
+            st.session_state['reset_password_user_name'] = u['name']
+            st.rerun()
+        
         # Delete button
-        if c4.button("🗑️", key=f"del_user_{u['id']}", help="削除"):
+        if c5.button("🗑️", key=f"del_user_{u['id']}", help="削除"):
             from src.database import delete_user
             success, msg = delete_user(u['id'])
             if success:
@@ -353,3 +364,46 @@ def _render_user_row(u, dept_options_with_none):
                 st.rerun()
             else:
                 st.error(msg)
+
+
+def _render_password_reset_dialog():
+    """管理者用パスワードリセットダイアログを表示"""
+    user_id = st.session_state.get('reset_password_user_id')
+    user_name = st.session_state.get('reset_password_user_name', '')
+    
+    if not user_id:
+        return
+    
+    @st.dialog(f"🔑 パスワードリセット: {user_name}")
+    def password_reset_dialog():
+        st.warning("管理者としてパスワードをリセットします。現在のパスワードは不要です。")
+        
+        new_password = st.text_input("新しいパスワード", type="password")
+        new_password_confirm = st.text_input("新しいパスワード（確認）", type="password")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("リセット実行", type="primary", use_container_width=True):
+                if not new_password or not new_password_confirm:
+                    st.error("パスワードを入力してください。")
+                elif new_password != new_password_confirm:
+                    st.error("パスワードが一致しません。")
+                elif len(new_password) < 4:
+                    st.error("パスワードは4文字以上にしてください。")
+                else:
+                    success, message = update_user_password(user_id, new_password)
+                    if success:
+                        st.success(f"{user_name} のパスワードをリセットしました。")
+                        st.session_state.pop('reset_password_user_id', None)
+                        st.session_state.pop('reset_password_user_name', None)
+                        st.rerun()
+                    else:
+                        st.error(f"エラー: {message}")
+        
+        with col2:
+            if st.button("キャンセル", use_container_width=True):
+                st.session_state.pop('reset_password_user_id', None)
+                st.session_state.pop('reset_password_user_name', None)
+                st.rerun()
+    
+    password_reset_dialog()
