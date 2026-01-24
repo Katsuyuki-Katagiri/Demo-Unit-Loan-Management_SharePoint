@@ -1401,7 +1401,7 @@ def get_check_session_lines(check_session_id: int):
 def get_all_check_sessions_for_loan(loan_id: int):
     """ローンに関連する全チェックセッションを取得"""
     client = get_client()
-    result = client.table("check_sessions").select("*").eq("loan_id", loan_id).order("id").execute()
+    result = client.table("check_sessions").select("*").eq("loan_id", loan_id).eq("canceled", 0).order("id").execute()
     return result.data
 
 def delete_unit_override(override_id: int):
