@@ -5,6 +5,8 @@ import os
 from typing import Optional, List, Dict, Any
 import bcrypt
 import streamlit as st
+import time
+import httpx
 from supabase import create_client, Client
 
 # Supabase接続
@@ -916,10 +918,21 @@ def create_issue(device_unit_id: int, check_session_id: int = None, summary: str
     return None
 
 def get_open_issues_for_unit(device_unit_id: int):
-    """個体のオープンな問題を取得"""
+    """個体のオープンな問題を取得（リトライ付き）"""
     client = get_client()
-    result = client.table("issues").select("*").eq("device_unit_id", device_unit_id).eq("status", "open").eq("canceled", 0).execute()
-    return result.data
+    max_retries = 3
+    for i in range(max_retries):
+        try:
+            result = client.table("issues").select("*").eq("device_unit_id", device_unit_id).eq("status", "open").eq("canceled", 0).execute()
+            return result.data
+        except httpx.ReadError:
+            if i == max_retries - 1:
+                raise
+            time.sleep(1 * (i + 1))  # Exponential backoff-like wait
+        except Exception:
+            # Other exceptions, re-raise immediately
+            raise
+    return []
 
 def resolve_issue(issue_id: int, resolved_by: str = ""):
     """問題を解決"""
