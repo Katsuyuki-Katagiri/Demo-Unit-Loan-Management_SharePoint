@@ -417,6 +417,7 @@ def create_initial_admin(email: str, name: str, password_str: str) -> bool:
         print(f"Error creating admin: {e}")
         return False
 
+@retry_supabase_query()
 def get_user_by_email(email: str):
     """メールアドレスでユーザーを取得"""
     client = get_client()
@@ -425,6 +426,7 @@ def get_user_by_email(email: str):
         return result.data[0]
     return None
 
+@retry_supabase_query()
 def get_user_by_id(user_id: int):
     """IDでユーザーを取得"""
     client = get_client()
@@ -616,6 +618,7 @@ def get_device_types(category_id: int = None):
     result = query.execute()
     return result.data
 
+@retry_supabase_query()
 def get_device_type_by_id(type_id: int):
     """IDで機種を取得"""
     client = get_client()
@@ -759,6 +762,110 @@ def get_device_units(device_type_id: int):
     result = client.table("device_units").select("*").eq("device_type_id", device_type_id).execute()
     return result.data
 
+# --- バッチクエリ関数（パフォーマンス最適化用） ---
+
+@retry_supabase_query()
+def get_all_device_units():
+    """全個体を一括取得（バッチクエリ用）"""
+    client = get_client()
+    result = client.table("device_units").select("*").execute()
+    return result.data
+
+@retry_supabase_query()
+def get_device_units_for_types(type_ids: list):
+    """
+    複数の機種の個体を一括取得
+    
+    Returns:
+        {type_id: [unit1, unit2, ...], ...} のディクショナリ
+    """
+    if not type_ids:
+        return {}
+    client = get_client()
+    result = client.table("device_units").select("*").in_("device_type_id", type_ids).execute()
+    
+    # 機種IDでグループ化
+    units_by_type = {}
+    for unit in result.data:
+        type_id = unit['device_type_id']
+        if type_id not in units_by_type:
+            units_by_type[type_id] = []
+        units_by_type[type_id].append(unit)
+    return units_by_type
+
+@retry_supabase_query()
+def get_users_batch(user_ids: list):
+    """
+    複数のユーザーを一括取得
+    
+    Returns:
+        {user_id: user_dict, ...} のディクショナリ
+    """
+    if not user_ids:
+        return {}
+    # 重複を除去
+    unique_ids = list(set(user_ids))
+    client = get_client()
+    result = client.table("users").select("*").in_("id", unique_ids).execute()
+    
+    # IDでディクショナリ化
+    return {u['id']: u for u in result.data}
+
+@retry_supabase_query()
+def get_active_loans_batch(unit_ids: list):
+    """
+    複数個体のアクティブな貸出を一括取得
+    
+    Returns:
+        {unit_id: loan_dict, ...} のディクショナリ（貸出中の個体のみ）
+    """
+    if not unit_ids:
+        return {}
+    client = get_client()
+    result = client.table("loans").select("*").in_("device_unit_id", unit_ids).eq("status", "open").eq("canceled", 0).execute()
+    
+    # 個体IDでディクショナリ化
+    return {l['device_unit_id']: l for l in result.data}
+
+@retry_supabase_query()
+def get_all_loan_periods(unit_ids: list, start_date: str, end_date: str):
+    """
+    複数個体の貸出期間を一括取得（稼働率計算用）
+    
+    Returns:
+        {unit_id: [(checkout_date, return_date), ...], ...} のディクショナリ
+    """
+    if not unit_ids:
+        return {}
+    client = get_client()
+    
+    # 期間と重なる可能性のある貸出を取得
+    # checkout_date <= end_date かつ (return_date >= start_date または return_date IS NULL)
+    result = client.table("loans").select(
+        "device_unit_id, checkout_date, returns(return_date)"
+    ).in_("device_unit_id", unit_ids).eq("canceled", 0).lte("checkout_date", end_date).execute()
+    
+    # 個体IDでグループ化
+    periods_by_unit = {}
+    for loan in result.data:
+        unit_id = loan['device_unit_id']
+        if unit_id not in periods_by_unit:
+            periods_by_unit[unit_id] = []
+        
+        return_date = None
+        if loan.get('returns') and isinstance(loan['returns'], list) and len(loan['returns']) > 0:
+            return_date = loan['returns'][0].get('return_date')
+        elif loan.get('returns') and isinstance(loan['returns'], dict):
+            return_date = loan['returns'].get('return_date')
+        
+        periods_by_unit[unit_id].append({
+            'checkout_date': loan['checkout_date'],
+            'return_date': return_date
+        })
+    
+    return periods_by_unit
+
+@retry_supabase_query()
 def get_device_unit_by_id(unit_id: int):
     """IDで個体を取得"""
     client = get_client()
@@ -834,6 +941,7 @@ def create_loan(device_unit_id: int, checkout_date: str, destination: str, purpo
         return result.data[0]["id"]
     return None
 
+@retry_supabase_query()
 def get_active_loan(device_unit_id: int):
     """アクティブな貸出を取得"""
     client = get_client()
@@ -999,6 +1107,7 @@ def delete_unit_override(override_id: int):
 
 # --- System Settings ---
 
+@retry_supabase_query()
 def get_system_setting(key: str) -> Optional[str]:
     """システム設定を取得"""
     client = get_client()
@@ -1322,6 +1431,7 @@ def delete_device_type(type_id: int):
     except Exception as e:
         return False, str(e)
 
+@retry_supabase_query()
 def get_notification_members(category_id: int):
     """カテゴリの通知メンバーを取得"""
     client = get_client()

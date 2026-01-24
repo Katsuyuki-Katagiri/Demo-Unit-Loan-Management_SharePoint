@@ -2,8 +2,8 @@
 import streamlit as st
 import datetime
 import pandas as pd
-from src.database import get_device_units, get_device_types, get_all_categories
-from src.logic import calculate_utilization
+from src.database import get_device_types, get_all_categories, get_all_device_units
+from src.logic import calculate_utilization_batch
 
 def render_analytics_view():
     from src.ui import render_header
@@ -34,46 +34,68 @@ def render_analytics_view():
     e_str = end_date.strftime('%Y-%m-%d')
     days_in_period = (end_date - start_date).days + 1
 
-    # --- 2. Data Aggregation ---
-    # Collect all data first
-    raw_data = [] # List of dicts with detailed info
-    
-    # Maps for aggregation
-    cat_rates = {}   # {cat_name: [rate1, rate2, ...]}
-    type_rates = {}  # {type_name: [rate1, rate2, ...]}
+    # --- 2. Data Aggregation (バッチクエリ最適化版) ---
+    raw_data = []
+    cat_rates = {}
+    type_rates = {}
     
     types = get_device_types()
     
-    # Progress bar for better UX if many units
+    # カテゴリIDでマップ作成
+    cat_map = {c['id']: c['name'] for c in categories}
+    
+    # 全個体を一括取得（バッチクエリ）
+    all_units = get_all_device_units()
+    
+    # 機種IDでユニットをグループ化
+    units_by_type = {}
+    for u in all_units:
+        type_id = u['device_type_id']
+        if type_id not in units_by_type:
+            units_by_type[type_id] = []
+        units_by_type[type_id].append(u)
+    
+    # 対象個体のIDを収集
+    target_unit_ids = []
+    unit_metadata = {}  # {unit_id: (cat_name, type_name, unit)}
+    
     with st.spinner('データを集計中...'):
         for t in types:
-            # Category Filter Logic
-            cat_obj = next((c for c in categories if c['id'] == t['category_id']), None)
-            cat_name = cat_obj['name'] if cat_obj else "Unknown"
+            cat_name = cat_map.get(t['category_id'], "Unknown")
             
             if selected_cat != "All" and cat_name != selected_cat:
                 continue
-
-            units = get_device_units(t['id'])
+            
+            units = units_by_type.get(t['id'], [])
             for u in units:
-                rate = calculate_utilization(u['id'], s_str, e_str)
-                
-                # Store raw data
-                raw_data.append({
-                    "カテゴリ": cat_name,
-                    "機種名": t['name'],
-                    "ロット": u['lot_number'],
-                    "保管場所": u['location'],
-                    "稼働率 (%)": rate,
-                    "RawRate": rate 
-                })
-                
-                # Aggregate
-                if cat_name not in cat_rates: cat_rates[cat_name] = []
-                cat_rates[cat_name].append(rate)
-                
-                if t['name'] not in type_rates: type_rates[t['name']] = []
-                type_rates[t['name']].append(rate)
+                target_unit_ids.append(u['id'])
+                unit_metadata[u['id']] = (cat_name, t['name'], u)
+        
+        # 稼働率を一括計算（バッチクエリ）
+        if target_unit_ids:
+            utilization_rates = calculate_utilization_batch(target_unit_ids, s_str, e_str)
+        else:
+            utilization_rates = {}
+        
+        # 結果を構築
+        for unit_id, (cat_name, type_name, u) in unit_metadata.items():
+            rate = utilization_rates.get(unit_id, 0.0)
+            
+            raw_data.append({
+                "カテゴリ": cat_name,
+                "機種名": type_name,
+                "ロット": u['lot_number'],
+                "保管場所": u['location'],
+                "稼働率 (%)": rate,
+                "RawRate": rate 
+            })
+            
+            # Aggregate
+            if cat_name not in cat_rates: cat_rates[cat_name] = []
+            cat_rates[cat_name].append(rate)
+            
+            if type_name not in type_rates: type_rates[type_name] = []
+            type_rates[type_name].append(rate)
 
     if not raw_data:
         st.info("対象期間・条件に一致するデータがありません。")

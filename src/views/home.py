@@ -4,7 +4,8 @@ from src.database import (
     get_all_categories, get_device_types, get_device_units, 
     get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR,
     get_active_loan, get_user_by_id, get_check_session_by_loan_id,
-    get_category_by_id, get_session_photos
+    get_category_by_id, get_session_photos,
+    get_device_units_for_types, get_users_batch, get_active_loans_batch
 )
 
 from src.logic import get_synthesized_checklist, get_image_base64
@@ -458,9 +459,23 @@ def render_home_view():
         if not types:
             st.info("この分類に登録されている機種はありません")
         else:
+            # バッチクエリで事前にデータを取得（パフォーマンス最適化）
+            type_ids = [t['id'] for t in types]
+            units_by_type = get_device_units_for_types(type_ids)
+            
+            # 貸出中の個体IDを収集してアクティブ貸出を一括取得
+            all_unit_ids = []
+            for t_id, units in units_by_type.items():
+                all_unit_ids.extend([u['id'] for u in units])
+            active_loans = get_active_loans_batch(all_unit_ids) if all_unit_ids else {}
+            
+            # 貸出のchecker_user_idを収集してユーザー情報を一括取得
+            user_ids = [loan['checker_user_id'] for loan in active_loans.values() if loan.get('checker_user_id')]
+            users_map = get_users_batch(user_ids) if user_ids else {}
+            
             for t in types:
                 # Determine Label with Status
-                units = get_device_units(t['id'])
+                units = units_by_type.get(t['id'], [])
                 
                 with st.container(border=True):
                     if units:
@@ -480,11 +495,11 @@ def render_home_view():
                         
                         # Line 3: Loan info (if loaned)
                         if status == 'loaned':
-                            loan_info = get_active_loan(unit['id'])
+                            loan_info = active_loans.get(unit['id'])
                             if loan_info:
                                 carrier_name = "Unknown"
                                 if loan_info['checker_user_id']:
-                                    u_obj = get_user_by_id(loan_info['checker_user_id'])
+                                    u_obj = users_map.get(loan_info['checker_user_id'])
                                     if u_obj: carrier_name = u_obj['name']
                                 else:
                                     sess = get_check_session_by_loan_id(loan_info['id'])

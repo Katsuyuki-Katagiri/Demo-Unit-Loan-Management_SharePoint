@@ -501,7 +501,6 @@ from src.database import (
 )
 import smtplib
 import json
-import threading
 from email.mime.text import MIMEText
 
 
@@ -570,36 +569,37 @@ def _blocking_issue_notification(device_unit_id: int, issue_id: int, component_n
     2. Check SMTP Settings
     3. Log and Send (if enabled)
     """
-    # 1. Get Unit -> Type -> Category
-    unit = get_device_unit_by_id(device_unit_id)
-    type_info = get_device_type_by_id(unit['device_type_id'])
-    category_id = type_info['category_id']
-    
-    members = get_notification_members(category_id)
-    if not members:
-        return # No one to notify
+    try:
+        # 1. Get Unit -> Type -> Category
+        unit = get_device_unit_by_id(device_unit_id)
+        type_info = get_device_type_by_id(unit['device_type_id'])
+        category_id = type_info['category_id']
         
-    # 2. SMTP Settings
-    smtp_enabled, smtp_config = _get_smtp_config()
+        members = get_notification_members(category_id)
+        if not members:
+            return # No one to notify
             
-    # 3. Get managing department name
-    managing_dept = get_category_managing_department(category_id)
-    dept_name = managing_dept['name'] if managing_dept else "管理部署"
-    
-    # 4. Process Members
-    for m in members:
-        recipient_email = m['email']
-        recipient_name = m['name']
+        # 2. SMTP Settings
+        smtp_enabled, smtp_config = _get_smtp_config()
+                
+        # 3. Get managing department name
+        managing_dept = get_category_managing_department(category_id)
+        dept_name = managing_dept['name'] if managing_dept else "管理部署"
         
-        # Always Log
-        log_status = 'logged_only'
-        error_msg = None
-        
-        if smtp_enabled and recipient_email:
-            try:
-                # Send Email
-                comment_disp = comment if comment else "なし"
-                msg = MIMEText(f"""
+        # 4. Process Members
+        for m in members:
+            recipient_email = m['email']
+            recipient_name = m['name']
+            
+            # Always Log
+            log_status = 'logged_only'
+            error_msg = None
+            
+            if smtp_enabled and recipient_email:
+                try:
+                    # Send Email
+                    comment_disp = comment if comment else "なし"
+                    msg = MIMEText(f"""
 {recipient_name} 様
 
 {type_info['name']} (Lot: {unit['lot_number']}) に関して、以下の要対応事項が発生しました。
@@ -613,24 +613,26 @@ def _blocking_issue_notification(device_unit_id: int, issue_id: int, component_n
 
 {dept_name}に報告お願いします。
 """)
-                msg['Subject'] = f"【デモ機管理アプリ報告】[要対応] {type_info['name']} (Lot: {unit['lot_number']})"
-                msg['From'] = smtp_config.get('from_addr', 'noreply@example.com')
-                msg['To'] = recipient_email
-                
-                with smtplib.SMTP(smtp_config.get('host', 'localhost'), int(smtp_config.get('port', 25))) as server:
-                    if smtp_config.get('user') and smtp_config.get('password'):
-                         # Optional: StartTLS if port 587? For now simple implementation.
-                         if int(smtp_config.get('port', 25)) == 587:
-                             server.starttls()
-                         server.login(smtp_config.get('user'), smtp_config.get('password'))
-                    server.send_message(msg)
-                
-                log_status = 'sent'
-            except Exception as e:
-                log_status = 'failed'
-                error_msg = str(e)
-                
-        log_notification('issue_created', issue_id, f"{recipient_name} ({recipient_email})", log_status, error_msg)
+                    msg['Subject'] = f"【デモ機管理アプリ報告】[要対応] {type_info['name']} (Lot: {unit['lot_number']})"
+                    msg['From'] = smtp_config.get('from_addr', 'noreply@example.com')
+                    msg['To'] = recipient_email
+                    
+                    with smtplib.SMTP(smtp_config.get('host', 'localhost'), int(smtp_config.get('port', 25))) as server:
+                        if smtp_config.get('user') and smtp_config.get('password'):
+                             # Optional: StartTLS if port 587? For now simple implementation.
+                             if int(smtp_config.get('port', 25)) == 587:
+                                 server.starttls()
+                             server.login(smtp_config.get('user'), smtp_config.get('password'))
+                        server.send_message(msg)
+                    
+                    log_status = 'sent'
+                except Exception as e:
+                    log_status = 'failed'
+                    error_msg = str(e)
+                    
+            log_notification('issue_created', issue_id, f"{recipient_name} ({recipient_email})", log_status, error_msg)
+    except Exception as e:
+        print(f"Error in _blocking_issue_notification: {e}")
 
 
 def trigger_user_notification(user_id: int, subject: str, body: str, log_event_type: str, related_id: int):
@@ -644,41 +646,33 @@ def trigger_user_notification(user_id: int, subject: str, body: str, log_event_t
     t.start()
     
 def _blocking_user_notification(user_id: int, subject: str, body: str, log_event_type: str, related_id: int):
-    from src.database import get_user_by_id
-    
-    user = get_user_by_id(user_id)
-    if not user or not user['email']:
-        return
+    try:
+        from src.database import get_user_by_id
         
-    recipient_email = user['email']
-    recipient_name = user['name']
-    
-    # SMTP Config
-    smtp_enabled, smtp_config = _get_smtp_config()
+        user = get_user_by_id(user_id)
+        if not user or not user['email']:
+            return
             
-    log_status = 'logged_only'
-    error_msg = None
-    
-    if smtp_enabled:
-        try:
-             msg = MIMEText(body)
-             msg['Subject'] = subject
-             msg['From'] = smtp_config.get('from_addr', 'noreply@example.com')
-             msg['To'] = recipient_email
-             
-             with smtplib.SMTP(smtp_config.get('host', 'localhost'), int(smtp_config.get('port', 25))) as server:
-                 if smtp_config.get('user') and smtp_config.get('password'):
-                     if int(smtp_config.get('port', 25)) == 587:
-                         server.starttls()
-                     server.login(smtp_config.get('user'), smtp_config.get('password'))
-                 server.send_message(msg)
-             
-             log_status = 'sent'
-        except Exception as e:
-            log_status = 'failed'
-            error_msg = str(e)
-            
-    log_notification(log_event_type, related_id, f"{recipient_name} ({recipient_email})", log_status, error_msg)
+        recipient_email = user['email']
+        recipient_name = user['name']
+        
+        # SMTP Config
+        smtp_enabled, smtp_config = _get_smtp_config()
+                
+        log_status = 'logged_only'
+        error_msg = None
+        
+        if smtp_enabled and recipient_email:
+            success, err = _send_email(smtp_config, recipient_email, subject, body)
+            if success:
+                log_status = 'sent'
+            else:
+                log_status = 'failed'
+                error_msg = err
+                
+        log_notification(log_event_type, related_id, f"{recipient_name} ({recipient_email})", log_status, error_msg)
+    except Exception as e:
+        print(f"Error in _blocking_user_notification: {e}")
 
 
 def trigger_group_notification(device_unit_id: int, subject: str, body: str, log_event_type: str, related_id: int):
@@ -696,53 +690,45 @@ def _blocking_group_notification(device_unit_id: int, subject: str, body: str, l
     2. そのカテゴリの通知グループメンバーを取得
     3. 全員にメール送信
     """
-    # 1. Get Unit -> Type -> Category
-    unit = get_device_unit_by_id(device_unit_id)
-    if not unit:
-        return
-    type_info = get_device_type_by_id(unit['device_type_id'])
-    if not type_info:
-        return
-    category_id = type_info['category_id']
-    
-    members = get_notification_members(category_id)
-    if not members:
-        return  # 通知先なし
+    try:
+        # 1. Get Unit -> Type -> Category
+        unit = get_device_unit_by_id(device_unit_id)
+        if not unit:
+            return
+        type_info = get_device_type_by_id(unit['device_type_id'])
+        if not type_info:
+            return
+        category_id = type_info['category_id']
         
-    # 2. SMTP Settings
-    smtp_enabled, smtp_config = _get_smtp_config()
+        members = get_notification_members(category_id)
+        if not members:
+            return  # 通知先なし
             
-    # 3. メンバー全員に送信
-    for m in members:
-        recipient_email = m['email']
-        recipient_name = m['name']
-        
-        log_status = 'logged_only'
-        error_msg = None
-        
-        # 本文を宛先名で置換（{recipient_name}がある場合）
-        personalized_body = body.replace('{recipient_name}', recipient_name)
-        
-        if smtp_enabled and recipient_email:
-            try:
-                msg = MIMEText(personalized_body)
-                msg['Subject'] = subject
-                msg['From'] = smtp_config.get('from_addr', 'noreply@example.com')
-                msg['To'] = recipient_email
+        # 2. SMTP Settings
+        smtp_enabled, smtp_config = _get_smtp_config()
                 
-                with smtplib.SMTP(smtp_config.get('host', 'localhost'), int(smtp_config.get('port', 25))) as server:
-                    if smtp_config.get('user') and smtp_config.get('password'):
-                        if int(smtp_config.get('port', 25)) == 587:
-                            server.starttls()
-                        server.login(smtp_config.get('user'), smtp_config.get('password'))
-                    server.send_message(msg)
-                
-                log_status = 'sent'
-            except Exception as e:
-                log_status = 'failed'
-                error_msg = str(e)
-                
-        log_notification(log_event_type, related_id, f"{recipient_name} ({recipient_email})", log_status, error_msg)
+        # 3. メンバー全員に送信
+        for m in members:
+            recipient_email = m['email']
+            recipient_name = m['name']
+            
+            log_status = 'logged_only'
+            error_msg = None
+            
+            # 本文を宛先名で置換（{recipient_name}がある場合）
+            personalized_body = body.replace('{recipient_name}', recipient_name)
+            
+            if smtp_enabled and recipient_email:
+                success, err = _send_email(smtp_config, recipient_email, subject, personalized_body)
+                if success:
+                    log_status = 'sent'
+                else:
+                    log_status = 'failed'
+                    error_msg = err
+                    
+            log_notification(log_event_type, related_id, f"{recipient_name} ({recipient_email})", log_status, error_msg)
+    except Exception as e:
+        print(f"Error in _blocking_group_notification: {e}")
 
 
 def calculate_utilization(device_unit_id: int, start_date_str: str, end_date_str: str):
@@ -789,3 +775,59 @@ def calculate_utilization(device_unit_id: int, start_date_str: str, end_date_str
     occupied_count = len(occupied_dates)
     return round((occupied_count / total_days) * 100, 1)
 
+
+def calculate_utilization_batch(unit_ids: list, start_date_str: str, end_date_str: str):
+    """
+    複数個体の稼働率を一括計算（パフォーマンス最適化版）
+    
+    Args:
+        unit_ids: 個体IDのリスト
+        start_date_str: 開始日（YYYY-MM-DD）
+        end_date_str: 終了日（YYYY-MM-DD）
+    
+    Returns:
+        {unit_id: rate, ...} のディクショナリ
+    """
+    if not unit_ids:
+        return {}
+    
+    start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
+    end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    
+    total_days = (end_date - start_date).days + 1
+    if total_days <= 0:
+        return {uid: 0.0 for uid in unit_ids}
+    
+    # バッチクエリで全個体の貸出期間を一括取得
+    from src.database import get_all_loan_periods
+    periods_by_unit = get_all_loan_periods(unit_ids, start_date_str, end_date_str)
+    
+    results = {}
+    for unit_id in unit_ids:
+        loans = periods_by_unit.get(unit_id, [])
+        occupied_dates = set()
+        
+        for l in loans:
+            l_start = datetime.datetime.strptime(l['checkout_date'], '%Y-%m-%d').date()
+            
+            if l['return_date']:
+                l_end = datetime.datetime.strptime(l['return_date'], '%Y-%m-%d').date()
+            else:
+                # Open loan: up to period end
+                l_end = end_date
+                
+            # Clip to Period
+            eff_start = max(start_date, l_start)
+            eff_end = min(end_date, l_end)
+            
+            if eff_start <= eff_end:
+                # Inclusive range
+                curr = eff_start
+                while curr <= eff_end:
+                    occupied_dates.add(curr)
+                    curr += datetime.timedelta(days=1)
+                    
+        occupied_count = len(occupied_dates)
+        results[unit_id] = round((occupied_count / total_days) * 100, 1)
+    
+    return results
