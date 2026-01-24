@@ -282,7 +282,7 @@ def render_return_view(unit_id: int):
                 )
                 
                 if result_status == 'in_stock':
-                    st.toast("返却登録完了", icon="✓")
+                    st.toast("返却登録完了", icon="✅")
                 else:
                     st.toast("登録完了（要対応）", icon="⚠️")
                 

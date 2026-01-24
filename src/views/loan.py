@@ -242,7 +242,7 @@ def render_loan_view(unit_id: int):
                 )
                 
                 if result_status == 'loaned':
-                    st.toast("貸出登録完了", icon="✓")
+                    st.toast("貸出登録完了", icon="✅")
                 else:
                     st.toast("登録完了（要対応）", icon="⚠️")
                 
