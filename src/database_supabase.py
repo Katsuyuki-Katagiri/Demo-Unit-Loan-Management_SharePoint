@@ -1068,8 +1068,10 @@ def create_return(
     notes: str = None, 
     confirmation_checked: bool = False
 ):
-    """返却を作成"""
+    """返却を作成し、貸出をクローズ"""
     client = get_client()
+    
+    # 1. Create Return
     result = client.table("returns").insert({
         "loan_id": loan_id,
         "return_date": return_date,
@@ -1078,7 +1080,10 @@ def create_return(
         "notes": notes,
         "confirmation_checked": confirmation_checked
     }).execute()
+    
     if result.data:
+        # 2. Close Loan
+        client.table("loans").update({"status": "closed"}).eq("id", loan_id).execute()
         return result.data[0]["id"]
     return None
 
