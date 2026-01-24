@@ -50,6 +50,7 @@ STORAGE_BUCKET = "item-photos"
 
 # --- Supabase Storage ---
 
+@retry_supabase_query()
 def upload_photo_to_storage(file_bytes: bytes, filename: str) -> str:
     """
     Supabase Storageに写真をアップロードし、公開URLを返す
@@ -79,6 +80,7 @@ def upload_photo_to_storage(file_bytes: bytes, filename: str) -> str:
         return ""
 
 
+@retry_supabase_query()
 def delete_photo_from_storage(filename: str) -> bool:
     """
     Supabase Storageから写真を削除
@@ -98,6 +100,7 @@ def delete_photo_from_storage(filename: str) -> bool:
         return False
 
 
+@retry_supabase_query()
 def get_photo_public_url(filename: str) -> str:
     """
     ファイル名から公開URLを取得
@@ -130,6 +133,7 @@ SESSION_PHOTOS_BUCKET = "session-photos"
 SESSION_PHOTOS_LIMIT = 2000
 
 
+@retry_supabase_query()
 def count_all_session_photos() -> int:
     """
     session-photosバケット内の全写真数をカウント
@@ -158,6 +162,7 @@ def count_all_session_photos() -> int:
         return 0
 
 
+@retry_supabase_query()
 def get_protected_session_folders() -> set:
     """
     削除対象から除外すべきセッションフォルダを取得
@@ -192,6 +197,7 @@ def get_protected_session_folders() -> set:
         return protected
 
 
+@retry_supabase_query()
 def get_oldest_session_folders(limit: int = 10) -> list:
     """
     最も古いセッションフォルダを取得（作成日時順）
@@ -234,6 +240,7 @@ def get_oldest_session_folders(limit: int = 10) -> list:
         return []
 
 
+@retry_supabase_query()
 def delete_session_folder(folder_name: str) -> tuple:
     """
     セッションフォルダとその中のファイルを全て削除
@@ -311,6 +318,7 @@ def cleanup_old_session_photos() -> tuple:
         return 0, 0
 
 
+@retry_supabase_query()
 def upload_session_photo(session_id: str, file_bytes: bytes, index: int = 0) -> str:
     """
     貸出・返却時のセッション写真をSupabase Storageにアップロード
@@ -358,6 +366,7 @@ def upload_session_photo(session_id: str, file_bytes: bytes, index: int = 0) -> 
         return ""
 
 
+@retry_supabase_query()
 def get_session_photos(session_id: str) -> list:
     """
     セッションの写真URL一覧を取得
@@ -392,6 +401,7 @@ def init_db():
 
 # --- User & Auth ---
 
+@retry_supabase_query()
 def create_initial_admin(email: str, name: str, password_str: str) -> bool:
     """初期管理者を作成"""
     client = get_client()
@@ -536,12 +546,14 @@ def seed_categories():
             pass
 
 @st.cache_data(ttl=60)
+@retry_supabase_query()
 def get_all_categories():
     """全カテゴリを取得"""
     client = get_client()
     result = client.table("categories").select("*").order("sort_order").order("id").execute()
     return result.data
 
+@retry_supabase_query()
 def get_category_by_id(category_id: int):
     """IDでカテゴリを取得"""
     client = get_client()
@@ -550,6 +562,7 @@ def get_category_by_id(category_id: int):
         return result.data[0]
     return None
 
+@retry_supabase_query()
 def create_category(name: str):
     """カテゴリを作成"""
     client = get_client()
@@ -559,6 +572,7 @@ def create_category(name: str):
     except Exception as e:
         return False, f"カテゴリ作成エラー: {e}"
 
+@retry_supabase_query()
 def update_category_basic_info(category_id: int, new_name: str, description: str, sort_order: int = 0):
     """カテゴリの基本情報を更新"""
     client = get_client()
@@ -580,6 +594,7 @@ def update_category_name(category_id: int, new_name: str):
     order = cat.get("sort_order", 0) if cat else 0
     return update_category_basic_info(category_id, new_name, desc, order)
 
+@retry_supabase_query()
 def delete_category(category_id: int):
     """カテゴリを削除"""
     client = get_client()
@@ -597,6 +612,7 @@ def delete_category(category_id: int):
 
 # --- Device Types ---
 
+@retry_supabase_query()
 def create_device_type(category_id: int, name: str):
     """機種を作成"""
     client = get_client()
@@ -609,6 +625,7 @@ def create_device_type(category_id: int, name: str):
     return None
 
 @st.cache_data(ttl=60)
+@retry_supabase_query()
 def get_device_types(category_id: int = None):
     """機種一覧を取得"""
     client = get_client()
@@ -627,6 +644,7 @@ def get_device_type_by_id(type_id: int):
         return result.data[0]
     return None
 
+@retry_supabase_query()
 def update_device_type_name(type_id: int, new_name: str) -> bool:
     """機種名を更新"""
     client = get_client()
@@ -638,6 +656,7 @@ def update_device_type_name(type_id: int, new_name: str) -> bool:
 
 # --- Items ---
 
+@retry_supabase_query()
 def create_item(name: str, tips: str = "", photo_path: str = ""):
     """構成品を作成"""
     client = get_client()
@@ -651,12 +670,14 @@ def create_item(name: str, tips: str = "", photo_path: str = ""):
     return None
 
 @st.cache_data(ttl=60)
+@retry_supabase_query()
 def get_all_items():
     """全構成品を取得"""
     client = get_client()
     result = client.table("items").select("*").execute()
     return result.data
 
+@retry_supabase_query()
 def get_item_by_exact_name(name: str):
     """名前で構成品を取得"""
     client = get_client()
@@ -665,6 +686,7 @@ def get_item_by_exact_name(name: str):
         return result.data[0]
     return None
 
+@retry_supabase_query()
 def update_item(item_id: int, name: str, tips: str, photo_path: str):
     """構成品を更新"""
     client = get_client()
@@ -678,6 +700,7 @@ def update_item(item_id: int, name: str, tips: str, photo_path: str):
         print(e)
         return False
 
+@retry_supabase_query()
 def delete_item(item_id: int):
     """構成品を削除"""
     client = get_client()
@@ -697,6 +720,7 @@ def delete_item(item_id: int):
 
 # --- Template Lines ---
 
+@retry_supabase_query()
 def add_template_line(device_type_id: int, item_id: int, required_qty: int):
     """テンプレート行を追加または更新"""
     client = get_client()
@@ -713,6 +737,7 @@ def add_template_line(device_type_id: int, item_id: int, required_qty: int):
             "required_qty": required_qty
         }).execute()
 
+@retry_supabase_query()
 def get_template_lines(device_type_id: int):
     """テンプレート行を取得"""
     client = get_client()
@@ -733,6 +758,7 @@ def get_template_lines(device_type_id: int):
         })
     return lines
 
+@retry_supabase_query()
 def delete_template_line(device_type_id: int, item_id: int):
     """テンプレート行を削除"""
     client = get_client()
@@ -740,6 +766,7 @@ def delete_template_line(device_type_id: int, item_id: int):
 
 # --- Device Units ---
 
+@retry_supabase_query()
 def create_device_unit(device_type_id: int, lot_number: str, mfg_date: str = "", location: str = "", last_check_date: str = "", next_check_date: str = ""):
     """個体を作成"""
     client = get_client()
@@ -756,6 +783,7 @@ def create_device_unit(device_type_id: int, lot_number: str, mfg_date: str = "",
     except Exception:
         return False
 
+@retry_supabase_query()
 def get_device_units(device_type_id: int):
     """機種の個体一覧を取得"""
     client = get_client()
@@ -874,6 +902,7 @@ def get_device_unit_by_id(unit_id: int):
         return result.data[0]
     return None
 
+@retry_supabase_query()
 def update_device_unit(unit_id: int, lot_number: str, mfg_date: str, location: str, last_check_date: str, next_check_date: str):
     """個体を更新"""
     client = get_client()
@@ -889,6 +918,7 @@ def update_device_unit(unit_id: int, lot_number: str, mfg_date: str, location: s
     except Exception:
         return False
 
+@retry_supabase_query()
 def update_device_unit_status(unit_id: int, status: str):
     """個体のステータスを更新"""
     client = get_client()
@@ -899,6 +929,7 @@ def update_device_unit_status(unit_id: int, status: str):
         print(f"Error updating unit status: {e}")
         return False
 
+@retry_supabase_query()
 def delete_device_unit(unit_id: int):
     """個体を削除（カスケード）"""
     client = get_client()
@@ -924,6 +955,7 @@ def delete_device_unit(unit_id: int):
 
 # --- Loans ---
 
+@retry_supabase_query()
 def create_loan(device_unit_id: int, checkout_date: str, destination: str, purpose: str, checker_user_id: int = None, notes: str = "", assetment_checked: bool = False):
     """貸出を作成"""
     client = get_client()
@@ -950,11 +982,13 @@ def get_active_loan(device_unit_id: int):
         return result.data[0]
     return None
 
+@retry_supabase_query()
 def close_loan(loan_id: int):
     """貸出をクローズ"""
     client = get_client()
     client.table("loans").update({"status": "closed"}).eq("id", loan_id).execute()
 
+@retry_supabase_query()
 def get_loan_by_id(loan_id: int):
     """IDで貸出を取得"""
     client = get_client()
@@ -965,6 +999,7 @@ def get_loan_by_id(loan_id: int):
 
 # --- Check Sessions ---
 
+@retry_supabase_query()
 def create_check_session(session_type: str, device_unit_id: int, loan_id: int = None, performed_by: str = "", device_photo_dir: str = ""):
     """チェックセッションを作成"""
     client = get_client()
@@ -979,6 +1014,7 @@ def create_check_session(session_type: str, device_unit_id: int, loan_id: int = 
         return result.data[0]["id"]
     return None
 
+@retry_supabase_query()
 def create_check_line(check_session_id: int, item_id: int, required_qty: int, result: str, ng_reason: str = None, found_qty: int = None, comment: str = None):
     """チェック明細を作成"""
     client = get_client()
@@ -997,6 +1033,7 @@ def create_check_line(check_session_id: int, item_id: int, required_qty: int, re
         
     client.table("check_lines").insert(data).execute()
 
+@retry_supabase_query()
 def get_check_session_by_loan_id(loan_id: int):
     """貸出IDでチェックセッションを取得"""
     client = get_client()
@@ -1005,12 +1042,14 @@ def get_check_session_by_loan_id(loan_id: int):
         return result.data[0]
     return None
 
+@retry_supabase_query()
 def get_check_sessions_for_unit(device_unit_id: int, limit: int = 10):
     """個体のチェックセッション履歴を取得"""
     client = get_client()
     result = client.table("check_sessions").select("*").eq("device_unit_id", device_unit_id).eq("canceled", 0).order("performed_at", desc=True).limit(limit).execute()
     return result.data
 
+@retry_supabase_query()
 def get_check_lines_for_session(session_id: int):
     """セッションのチェック行を取得"""
     client = get_client()
@@ -1027,6 +1066,7 @@ def get_check_lines_for_session(session_id: int):
 
 # --- Issues ---
 
+@retry_supabase_query()
 def create_issue(device_unit_id: int, check_session_id: int = None, summary: str = "", created_by: str = ""):
     """問題を作成"""
     client = get_client()
@@ -1048,6 +1088,7 @@ def get_open_issues_for_unit(device_unit_id: int):
     result = client.table("issues").select("*").eq("device_unit_id", device_unit_id).eq("status", "open").eq("canceled", 0).execute()
     return result.data
 
+@retry_supabase_query()
 def resolve_issue(issue_id: int, resolved_by: str = ""):
     """問題を解決"""
     client = get_client()
@@ -1060,6 +1101,7 @@ def resolve_issue(issue_id: int, resolved_by: str = ""):
 
 # --- Returns ---
 
+@retry_supabase_query()
 def create_return(
     loan_id: int, 
     return_date: str, 
@@ -1089,6 +1131,7 @@ def create_return(
 
 # --- Unit Overrides ---
 
+@retry_supabase_query()
 def add_unit_override(device_unit_id: int, item_id: int, action: str, qty: int = None):
     """個体差分を追加"""
     client = get_client()
@@ -1099,12 +1142,14 @@ def add_unit_override(device_unit_id: int, item_id: int, action: str, qty: int =
         "qty": qty
     }).execute()
 
+@retry_supabase_query()
 def get_unit_overrides(device_unit_id: int):
     """個体差分を取得"""
     client = get_client()
     result = client.table("unit_overrides").select("*").eq("device_unit_id", device_unit_id).execute()
     return result.data
 
+@retry_supabase_query()
 def delete_unit_override(override_id: int):
     """個体差分を削除"""
     client = get_client()
@@ -1121,6 +1166,7 @@ def get_system_setting(key: str) -> Optional[str]:
         return result.data[0]["value"]
     return None
 
+@retry_supabase_query()
 def set_system_setting(key: str, value: str):
     """システム設定を保存"""
     client = get_client()
@@ -1133,6 +1179,7 @@ def set_system_setting(key: str, value: str):
 
 # --- Notification Groups ---
 
+@retry_supabase_query()
 def get_notification_group_users(category_id: int):
     """カテゴリの通知グループユーザーを取得"""
     client = get_client()
@@ -1145,6 +1192,7 @@ def get_notification_group_users(category_id: int):
             users.append(user)
     return users
 
+@retry_supabase_query()
 def add_user_to_notification_group(category_id: int, user_id: int):
     """ユーザーを通知グループに追加"""
     client = get_client()
@@ -1157,6 +1205,7 @@ def add_user_to_notification_group(category_id: int, user_id: int):
     except Exception:
         return False
 
+@retry_supabase_query()
 def remove_user_from_notification_group(category_id: int, user_id: int):
     """ユーザーを通知グループから削除"""
     client = get_client()
@@ -1164,6 +1213,7 @@ def remove_user_from_notification_group(category_id: int, user_id: int):
 
 # --- Notification Logs ---
 
+@retry_supabase_query()
 def log_notification(event_type: str, related_id: int, recipient: str, status: str, error_message: str = None):
     """通知ログを記録"""
     client = get_client()
@@ -1177,12 +1227,14 @@ def log_notification(event_type: str, related_id: int, recipient: str, status: s
 
 # --- Departments ---
 
+@retry_supabase_query()
 def get_all_departments():
     """全部署を取得"""
     client = get_client()
     result = client.table("departments").select("*").execute()
     return result.data
 
+@retry_supabase_query()
 def create_department(name: str):
     """部署を作成"""
     client = get_client()
@@ -1194,6 +1246,7 @@ def create_department(name: str):
 
 # --- Synthesized Checklist (Logic) ---
 
+@retry_supabase_query()
 def get_synthesized_checklist(device_type_id: int, device_unit_id: int):
     """テンプレートと個体差分を合成したチェックリストを取得"""
     template_lines = get_template_lines(device_type_id)
@@ -1241,6 +1294,7 @@ def get_synthesized_checklist(device_type_id: int, device_unit_id: int):
 
 # --- Statistics ---
 
+@retry_supabase_query()
 def get_status_counts_for_category(category_id: int) -> Dict[str, int]:
     """カテゴリのステータス別個体数を取得"""
     client = get_client()
@@ -1289,6 +1343,7 @@ def update_category_visibility(category_id: int, is_visible: bool):
     # Supabaseではis_visible列を使用しない場合、この関数は不要
     pass
 
+@retry_supabase_query()
 def move_category_order(category_id: int, direction: str):
     """カテゴリの順序を変更"""
     client = get_client()
@@ -1332,6 +1387,7 @@ def get_open_issues(device_unit_id: int):
     """オープンな問題を取得（SQLite互換エイリアス）"""
     return get_open_issues_for_unit(device_unit_id)
 
+@retry_supabase_query()
 def cancel_record(table: str, record_id: int, user_name: str, reason: str):
     """レコードをキャンセル"""
     client = get_client()
@@ -1348,6 +1404,7 @@ def cancel_record(table: str, record_id: int, user_name: str, reason: str):
         "cancel_reason": reason
     }).eq("id", record_id).execute()
 
+@retry_supabase_query()
 def get_related_records(loan_id: int = None, return_id: int = None):
     """関連レコードを取得（キャンセル用）"""
     client = get_client()
@@ -1371,6 +1428,7 @@ def get_related_records(loan_id: int = None, return_id: int = None):
     
     return res
 
+@retry_supabase_query()
 def get_loan_history(device_unit_id: int, limit: int = None, offset: int = 0, include_canceled: bool = True):
     """貸出履歴を取得"""
     client = get_client()
@@ -1388,6 +1446,7 @@ def get_loan_history(device_unit_id: int, limit: int = None, offset: int = 0, in
     result = query.execute()
     return result.data
 
+@retry_supabase_query()
 def get_check_session_lines(check_session_id: int):
     """チェックセッションの行を取得"""
     client = get_client()
@@ -1403,6 +1462,7 @@ def get_check_session_lines(check_session_id: int):
         })
     return lines
 
+@retry_supabase_query()
 def get_all_check_sessions_for_loan(loan_id: int):
     """ローンに関連する全チェックセッションを取得"""
     client = get_client()
@@ -1414,6 +1474,7 @@ def delete_unit_override(override_id: int):
     client = get_client()
     client.table("unit_overrides").delete().eq("id", override_id).execute()
 
+@retry_supabase_query()
 def delete_device_type(type_id: int):
     """機種を削除（カスケード）"""
     client = get_client()
@@ -1449,6 +1510,7 @@ def get_notification_members(category_id: int):
             members.append(user)
     return members
 
+@retry_supabase_query()
 def add_notification_member(category_id: int, user_id: int):
     """通知メンバーを追加"""
     client = get_client()
@@ -1461,11 +1523,13 @@ def add_notification_member(category_id: int, user_id: int):
     except Exception:
         return False
 
+@retry_supabase_query()
 def remove_notification_member(category_id: int, user_id: int):
     """通知メンバーを削除"""
     client = get_client()
     client.table("notification_groups").delete().eq("category_id", category_id).eq("user_id", user_id).execute()
 
+@retry_supabase_query()
 def get_category_managing_department(category_id: int):
     """カテゴリの管理部署を取得"""
     client = get_client()
@@ -1483,6 +1547,7 @@ def get_category_managing_department(category_id: int):
         return dept_result.data[0]
     return None
 
+@retry_supabase_query()
 def update_category_managing_department(category_id: int, department_id: int = None):
     """カテゴリの管理部署を更新"""
     client = get_client()
@@ -1492,6 +1557,7 @@ def update_category_managing_department(category_id: int, department_id: int = N
     except Exception:
         return False
 
+@retry_supabase_query()
 def get_department_by_id(department_id: int):
     """部署をIDで取得"""
     client = get_client()
@@ -1500,6 +1566,7 @@ def get_department_by_id(department_id: int):
         return result.data[0]
     return None
 
+@retry_supabase_query()
 def update_department(department_id: int, name: str):
     """部署を更新"""
     client = get_client()
@@ -1509,6 +1576,7 @@ def update_department(department_id: int, name: str):
     except Exception:
         return False
 
+@retry_supabase_query()
 def delete_department(department_id: int):
     """部署を削除"""
     client = get_client()
@@ -1524,11 +1592,13 @@ def delete_department(department_id: int):
     except Exception as e:
         return False, str(e)
 
+@retry_supabase_query()
 def update_user_department(user_id: int, department_id: int = None):
     """ユーザーの部署を更新"""
     client = get_client()
     client.table("users").update({"department_id": department_id}).eq("id", user_id).execute()
 
+@retry_supabase_query()
 def get_users_by_department(department_id: int = None):
     """部署でユーザーを取得"""
     client = get_client()
@@ -1538,6 +1608,7 @@ def get_users_by_department(department_id: int = None):
         result = client.table("users").select("*").is_("department_id", "null").execute()
     return result.data
 
+@retry_supabase_query()
 def get_notification_logs(limit: int = 50):
     """通知ログを取得"""
     client = get_client()
@@ -1548,6 +1619,7 @@ def save_system_setting(key: str, value: str):
     """システム設定を保存（エイリアス）"""
     return set_system_setting(key, value)
 
+@retry_supabase_query()
 def get_unit_status_counts(category_id: int = None):
     """ステータスごとの個体数を取得"""
     client = get_client()
@@ -1573,6 +1645,7 @@ def get_unit_status_counts(category_id: int = None):
     
     return counts
 
+@retry_supabase_query()
 def reset_database_keep_admin():
     """データベースをリセット（管理者のみ保持）"""
     client = get_client()
