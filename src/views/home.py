@@ -295,11 +295,11 @@ def render_home_view():
                 st.markdown("""
                     <style>
                     div.stButton > button[kind="primary"] {
-                        background-color: #2196F3 !important;
+                        background: #2196F3 !important;
                         border-color: #2196F3 !important;
                     }
                     div.stButton > button[kind="primary"]:hover {
-                        background-color: #1976D2 !important;
+                        background: #1976D2 !important;
                         border-color: #1976D2 !important;
                     }
                     </style>
@@ -315,11 +315,11 @@ def render_home_view():
                  st.markdown("""
                     <style>
                     div.stButton > button[kind="primary"] {
-                        background-color: #F44336 !important;
+                        background: #F44336 !important;
                         border-color: #F44336 !important;
                     }
                     div.stButton > button[kind="primary"]:hover {
-                        background-color: #D32F2F !important;
+                        background: #D32F2F !important;
                         border-color: #D32F2F !important;
                     }
                     </style>
