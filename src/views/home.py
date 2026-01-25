@@ -494,11 +494,22 @@ def render_home_view():
             
             for t in types:
                 # Group Header
-                # st.subheader(t['name']) # Optional: currently using cards which show name
-
+                st.markdown(f"**{t['name']}**")
+                if t.get('description'):
+                    st.caption(t.get('description'))
+                
                 units = units_by_type.get(t['id'], [])
-                # Sort units by lot number (handle None)
-                units.sort(key=lambda x: x['lot_number'] if x['lot_number'] else "")
+                
+                # Sort units by lot number (Numeric sort if possible, else String)
+                def sort_key(u):
+                    val = u.get('lot_number', '') or ''
+                    # Try to convert to int for sorting
+                    try:
+                        return (0, int(val))
+                    except ValueError:
+                        return (1, val)
+                
+                units.sort(key=sort_key)
                 
                 if units:
                     for unit in units:
@@ -514,7 +525,7 @@ def render_home_view():
                                 st.markdown("**⚠️ 要対応**")
                             
                             # Line 2: Device + Lot
-                            st.markdown(f"**{t['name']}** (Lot: {unit['lot_number']})")
+                            st.markdown(f"Lot: {unit['lot_number']}")
                             
                             # Line 3: Loan info (if loaned)
                             if status == 'loaned':
@@ -547,10 +558,9 @@ def render_home_view():
                                 st.session_state['selected_unit_id'] = unit['id']
                                 st.rerun()
                 else:
-                    # No units for this type
-                    with st.container(border=True):
-                        st.markdown(f"**{t['name']}**")
-                        st.caption("登録機器なし")
+                    st.caption("登録機器なし")
+                
+                st.divider() # Separator between types
 
     # --- Level 0: Categories (Home) ---
     else:
