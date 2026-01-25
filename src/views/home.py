@@ -85,6 +85,8 @@ def render_home_view():
         c1, c2 = st.columns([3, 1])
         with c1:
             st.title(f"{type_info['name']} (Lot: {unit['lot_number']})")
+            if type_info.get('description'):
+                st.caption(type_info['description'])
             # Determine display info
             location_disp = f"保管場所: {unit['location']}"
             loaner_disp = ""
@@ -491,60 +493,64 @@ def render_home_view():
             users_map = get_users_batch(user_ids) if user_ids else {}
             
             for t in types:
-                # Determine Label with Status
+                # Group Header
+                # st.subheader(t['name']) # Optional: currently using cards which show name
+
                 units = units_by_type.get(t['id'], [])
+                # Sort units by lot number (handle None)
+                units.sort(key=lambda x: x['lot_number'] if x['lot_number'] else "")
                 
-                with st.container(border=True):
-                    if units:
-                        unit = units[0]
-                        status = unit['status']
-                        
-                        # Line 1: Status badge
-                        if status == 'in_stock':
-                            st.markdown("**✅ 在庫あり**")
-                        elif status == 'loaned':
-                            st.markdown("**🔴 貸出中**")
-                        elif status == 'needs_attention':
-                            st.markdown("**⚠️ 要対応**")
-                        
-                        # Line 2: Device + Lot
-                        st.markdown(f"**{t['name']}** (Lot: {unit['lot_number']})")
-                        
-                        # Line 3: Loan info (if loaned)
-                        if status == 'loaned':
-                            loan_info = active_loans.get(unit['id'])
-                            if loan_info:
-                                carrier_name = "Unknown"
-                                if loan_info['checker_user_id']:
-                                    u_obj = users_map.get(loan_info['checker_user_id'])
-                                    if u_obj: carrier_name = u_obj['name']
-                                else:
-                                    sess = get_check_session_by_loan_id(loan_info['id'])
-                                    if sess: carrier_name = sess['performed_by']
-                                
-                                st.caption(f"📍 {loan_info['destination']} / 持出者: {carrier_name} / {loan_info['checkout_date']}")
-                                if 'notes' in loan_info.keys() and loan_info['notes']:
-                                    st.caption(f"備考: {loan_info['notes']}")
-                        
-                        # Line 4: Maintenance dates
-                        if unit['last_check_date'] or unit['next_check_date']:
-                            parts = []
-                            if unit['last_check_date']:
-                                parts.append(f"点検: {unit['last_check_date']}")
-                            if unit['next_check_date']:
-                                parts.append(f"次回: {unit['next_check_date']}")
-                            st.caption(" | ".join(parts))
-                        
-                        # Select button
-                        if st.button("選択 →", key=f"type_{t['id']}", use_container_width=True):
-                            st.session_state['selected_type_id'] = t['id']
-                            st.session_state['selected_unit_id'] = unit['id']
-                            st.rerun()
-                    else:
+                if units:
+                    for unit in units:
+                        with st.container(border=True):
+                            status = unit['status']
+                            
+                            # Line 1: Status badge
+                            if status == 'in_stock':
+                                st.markdown("**✅ 在庫あり**")
+                            elif status == 'loaned':
+                                st.markdown("**🔴 貸出中**")
+                            elif status == 'needs_attention':
+                                st.markdown("**⚠️ 要対応**")
+                            
+                            # Line 2: Device + Lot
+                            st.markdown(f"**{t['name']}** (Lot: {unit['lot_number']})")
+                            
+                            # Line 3: Loan info (if loaned)
+                            if status == 'loaned':
+                                loan_info = active_loans.get(unit['id'])
+                                if loan_info:
+                                    carrier_name = "Unknown"
+                                    if loan_info['checker_user_id']:
+                                        u_obj = users_map.get(loan_info['checker_user_id'])
+                                        if u_obj: carrier_name = u_obj['name']
+                                    else:
+                                        sess = get_check_session_by_loan_id(loan_info['id'])
+                                        if sess: carrier_name = sess['performed_by']
+                                    
+                                    st.caption(f"📍 {loan_info['destination']} / 持出者: {carrier_name} / {loan_info['checkout_date']}")
+                                    if 'notes' in loan_info.keys() and loan_info['notes']:
+                                        st.caption(f"備考: {loan_info['notes']}")
+                            
+                            # Line 4: Maintenance dates
+                            if unit['last_check_date'] or unit['next_check_date']:
+                                parts = []
+                                if unit['last_check_date']:
+                                    parts.append(f"点検: {unit['last_check_date']}")
+                                if unit['next_check_date']:
+                                    parts.append(f"次回: {unit['next_check_date']}")
+                                st.caption(" | ".join(parts))
+                            
+                            # Select button (Unique key per unit)
+                            if st.button("選択 →", key=f"sel_u_{unit['id']}_home", use_container_width=True):
+                                st.session_state['selected_type_id'] = t['id']
+                                st.session_state['selected_unit_id'] = unit['id']
+                                st.rerun()
+                else:
+                    # No units for this type
+                    with st.container(border=True):
                         st.markdown(f"**{t['name']}**")
-                        if st.button("選択 →", key=f"type_{t['id']}", use_container_width=True):
-                            st.session_state['selected_type_id'] = t['id']
-                            st.rerun()
+                        st.caption("登録機器なし")
 
     # --- Level 0: Categories (Home) ---
     else:
