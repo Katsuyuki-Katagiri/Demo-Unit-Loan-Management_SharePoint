@@ -492,22 +492,20 @@ def render_home_view():
             user_ids = [loan['checker_user_id'] for loan in active_loans.values() if loan.get('checker_user_id')]
             users_map = get_users_batch(user_ids) if user_ids else {}
             
+            # Map type_id to description for unit-level display
+            type_desc_map = {t['id']: t.get('description', '') for t in types}
+
             # Group types by name (to handle duplicate "BP3" etc.)
             types_by_name = {}
             for t in types:
                 if t['name'] not in types_by_name:
-                    types_by_name[t['name']] = {'types': [], 'description': t.get('description', '')}
+                    types_by_name[t['name']] = {'types': []}
                 
                 types_by_name[t['name']]['types'].append(t)
-                # Keep the first non-empty description found
-                if not types_by_name[t['name']]['description'] and t.get('description'):
-                    types_by_name[t['name']]['description'] = t.get('description')
 
             for type_name, group_data in types_by_name.items():
                 # Group Header
                 st.markdown(f"**{type_name}**")
-                if group_data['description']:
-                    st.caption(group_data['description'])
                 
                 # Collect units from ALL types with this name
                 combined_units = []
@@ -519,20 +517,12 @@ def render_home_view():
                 # Sort units by lot number (Numeric sort if possible, else String)
                 def sort_key(u):
                     val = u.get('lot_number', '') or ''
-                    # Try to convert to int for sorting
                     try:
                         return (0, int(val))
                     except ValueError:
                         return (1, val)
                 
                 units.sort(key=sort_key)
-                
-                # Use the ID of the FIRST type for navigation if needed, 
-                # OR use the specific unit's original type ID.
-                # The 'Select' button needs unit's type_id.
-                # units list items are full unit objects?
-                # Wait, I need to know which type_id the unit belongs to for the selection state.
-                # The unit object from DB has 'device_type_id'.
                 
                 if units:
                     for unit in units:
@@ -549,6 +539,11 @@ def render_home_view():
                             
                             # Line 2: Device + Lot
                             st.markdown(f"Lot: {unit['lot_number']}")
+                            
+                            # Unit specific description (from its Type)
+                            desc = type_desc_map.get(unit['device_type_id'])
+                            if desc:
+                                st.caption(desc)
                             
                             # Line 3: Loan info (if loaned)
                             if status == 'loaned':
