@@ -17,7 +17,6 @@ from src.database import (
 
 def render_master_view():
     from src.ui import render_header
-    st.error(f"DEBUG: This file is loaded from: {os.path.abspath(__file__)}")
     render_header("マスタ管理", "settings")
     
     # Main Tabs
