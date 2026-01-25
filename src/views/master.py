@@ -422,6 +422,9 @@ def render_master_view():
                 </style>
             """, unsafe_allow_html=True)
             items = get_all_items()
+            # "汚れチェック"はマスタ画面から非表示（返却時チェックには使用するためDBには残す）
+            items = [i for i in items if i.get('name') != '汚れチェック']
+            
             for i in items:
                 # Defensive coding: missing keys protection
                 item_id = i.get('id')
