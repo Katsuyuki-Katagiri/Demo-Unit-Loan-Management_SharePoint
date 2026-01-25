@@ -97,6 +97,17 @@ def main():
 
     # 3. Main Logic (Logged In)
     
+    def reset_home_state():
+        """ホームボタンが押された時にホーム画面の状態をリセットするコールバック"""
+        if st.session_state.get('nav_selection') == "ホーム":
+            st.session_state['selected_category_id'] = None
+            st.session_state['selected_type_id'] = None
+            st.session_state['selected_unit_id'] = None
+            st.session_state['loan_mode'] = False
+            st.session_state['return_mode'] = False
+            if 'checklist_data' in st.session_state: del st.session_state['checklist_data']
+            if 'return_checklist_data' in st.session_state: del st.session_state['return_checklist_data']
+
     # Sidebar Navigation
     with st.sidebar:
         st.write(f"ユーザー: **{st.session_state.get('user_name')}**")
@@ -112,7 +123,8 @@ def main():
             page_options.append("マスタ管理")
             page_options.append("通知設定")
             
-        selected_page = st.radio("メニュー", page_options)
+        # keyとon_changeを追加して、選択変更時にリセット処理を実行
+        selected_page = st.radio("メニュー", page_options, key="nav_selection", on_change=reset_home_state)
         
         st.divider()
         
