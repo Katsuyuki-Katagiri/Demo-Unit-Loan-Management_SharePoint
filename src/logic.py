@@ -52,7 +52,7 @@ def compress_image(image_file, max_size=(800, 800), quality=65):
         print(f"Compression error: {e}")
         return None
 
-@st.cache_data
+@st.cache_data(ttl=60)
 def get_synthesized_checklist(device_type_id: int, device_unit_id: int):
     """
     Synthesize the final checklist for a specific unit.

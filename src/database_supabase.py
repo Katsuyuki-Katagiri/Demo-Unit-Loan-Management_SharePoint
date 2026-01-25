@@ -892,6 +892,55 @@ def get_all_loan_periods(unit_ids: list, start_date: str, end_date: str):
         })
     
     return periods_by_unit
+    
+@retry_supabase_query()
+def get_check_sessions_batch(loan_ids: list):
+    """
+    複数貸出のチェックセッションを一括取得
+    
+    Returns:
+        {loan_id: [session1, session2, ...], ...}
+    """
+    if not loan_ids:
+        return {}
+    client = get_client()
+    result = client.table("check_sessions").select("*").in_("loan_id", loan_ids).eq("canceled", 0).order("id").execute()
+    
+    sessions_by_loan = {}
+    for sess in result.data:
+        loan_id = sess['loan_id']
+        if loan_id not in sessions_by_loan:
+            sessions_by_loan[loan_id] = []
+        sessions_by_loan[loan_id].append(sess)
+    return sessions_by_loan
+
+@retry_supabase_query()
+def get_check_lines_batch(session_ids: list):
+    """
+    複数セッションのチェック明細を一括取得
+    
+    Returns:
+        {session_id: [line1, line2, ...], ...}
+    """
+    if not session_ids:
+        return {}
+    client = get_client()
+    # join with items to get name/photo
+    result = client.table("check_lines").select("*, items(name, photo_path)").in_("check_session_id", session_ids).execute()
+    
+    lines_by_session = {}
+    for row in result.data:
+        session_id = row['check_session_id']
+        if session_id not in lines_by_session:
+            lines_by_session[session_id] = []
+        
+        item = row.get("items", {})
+        lines_by_session[session_id].append({
+            **row,
+            "item_name": item.get("name", ""),
+            "photo_path": item.get("photo_path", "")
+        })
+    return lines_by_session
 
 @retry_supabase_query()
 def get_device_unit_by_id(unit_id: int):

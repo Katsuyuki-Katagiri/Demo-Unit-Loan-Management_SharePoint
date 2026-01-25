@@ -41,6 +41,7 @@ def render_master_view():
         departments = get_all_departments()
         dept_options = {"（未設定）": None}
         dept_options.update({d['name']: d['id'] for d in departments})
+        dept_map_by_id = {d['id']: d for d in departments}
         
         # --- Add New Category ---
         with st.expander("➕ 新しいカテゴリを追加", expanded=False):
@@ -131,7 +132,7 @@ def render_master_view():
                     current_dept_id = cat.get('managing_department_id')
                     current_dept_name = "（未設定）"
                     if current_dept_id:
-                        dept_info = get_department_by_id(current_dept_id)
+                        dept_info = dept_map_by_id.get(current_dept_id)
                         if dept_info:
                             current_dept_name = dept_info['name']
                     

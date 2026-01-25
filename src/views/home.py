@@ -5,7 +5,8 @@ from src.database import (
     get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR,
     get_active_loan, get_user_by_id, get_check_session_by_loan_id,
     get_category_by_id, get_session_photos,
-    get_device_units_for_types, get_users_batch, get_active_loans_batch
+    get_device_units_for_types, get_users_batch, get_active_loans_batch,
+    get_check_sessions_batch, get_check_lines_batch
 )
 
 from src.logic import get_synthesized_checklist, get_image_base64
@@ -148,6 +149,21 @@ def render_home_view():
                 if not displayed_history:
                     st.write("履歴なし")
                 else:
+                    # --- Batch Optimization ---
+                    user_ids = [l['checker_user_id'] for l in displayed_history if l['checker_user_id']]
+                    loan_ids = [l['id'] for l in displayed_history]
+                    
+                    users_map = get_users_batch(user_ids)
+                    sessions_map = get_check_sessions_batch(loan_ids)
+                    
+                    all_sessions = []
+                    for s_list in sessions_map.values():
+                        all_sessions.extend(s_list)
+                    session_ids = [s['id'] for s in all_sessions]
+                    
+                    lines_map = get_check_lines_batch(session_ids)
+                    # --------------------------
+
                     for l_row in displayed_history:
                         l = dict(l_row)
                         status_icon = "🟢" if l['status'] == 'open' else "⚫"
@@ -155,11 +171,12 @@ def render_home_view():
                         # Determine Carrier Name
                         carrier_name = "Unknown"
                         if l['checker_user_id']:
-                            u_obj = get_user_by_id(l['checker_user_id'])
+                            u_obj = users_map.get(l['checker_user_id'])
                             if u_obj: carrier_name = u_obj['name']
                         else:
                             # Fallback to check session
-                            sess = get_check_session_by_loan_id(l['id'])
+                            loan_sessions = sessions_map.get(l['id'], [])
+                            sess = next((s for s in loan_sessions if s['session_type'] == 'loan'), None)
                             if sess: carrier_name = sess['performed_by']
 
                         st.markdown(f"**{l['checkout_date']}** - {l['destination']} ({l['purpose']})")
@@ -186,8 +203,7 @@ def render_home_view():
                                 st.rerun()
                         
                         # --- Check Details ---
-                        from src.database import get_all_check_sessions_for_loan, get_check_session_lines
-                        sessions = get_all_check_sessions_for_loan(l['id'])
+                        sessions = sessions_map.get(l['id'], [])
                         if sessions:
                             for sess in sessions:
                                 s_type_label = "貸出時チェック" if sess['session_type'] == 'checkout' else "返却時チェック"
@@ -238,7 +254,7 @@ def render_home_view():
                                                                 cols[j].image(os.path.join(photo_dir_path, photos[i+j]), use_container_width=True)
                                                     st.divider()
 
-                                    lines = get_check_session_lines(sess['id'])
+                                    lines = lines_map.get(sess['id'], [])
                                     if not lines:
                                         st.caption("詳細データなし")
                                     else:
