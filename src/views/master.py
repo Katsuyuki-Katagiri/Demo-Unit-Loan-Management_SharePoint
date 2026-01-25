@@ -425,12 +425,13 @@ def render_master_view():
             for i in items:
                 with st.expander(f"{i['name']}"):
                     c_img, c_txt = st.columns([1, 2])
-                    if i['photo_path']:
+                    photo_path = i.get('photo_path')
+                    if photo_path:
                         # URLの場合は直接表示、ローカルパスの場合は既存の処理
-                        if i['photo_path'].startswith('http'):
-                            c_img.image(i['photo_path'])
+                        if photo_path.startswith('http'):
+                            c_img.image(photo_path)
                         else:
-                            fp = os.path.join(UPLOAD_DIR, i['photo_path'])
+                            fp = os.path.join(UPLOAD_DIR, photo_path)
                             if os.path.exists(fp):
                                 c_img.image(fp)
                     c_txt.write(i['tips'])
