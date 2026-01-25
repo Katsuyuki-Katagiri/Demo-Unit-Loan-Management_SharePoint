@@ -668,7 +668,6 @@ def create_item(name: str, tips: str = "", photo_path: str = ""):
         return result.data[0]["id"]
     return None
 
-@st.cache_data(ttl=60)
 @retry_supabase_query()
 def get_all_items():
     """全構成品を取得"""
