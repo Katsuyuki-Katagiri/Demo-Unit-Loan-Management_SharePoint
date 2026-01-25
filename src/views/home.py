@@ -551,6 +551,8 @@ def render_home_view():
         from src.ui import render_header
         render_header("デモ機管理アプリ", "home")
         
+        st.caption("デモ機を持ち出すとき、または返却した時に下記から登録処理して下さい。Assetment Neoへの登録は別途行って下さい")
+        
         # Dashboard summary moved to category view (Level 1)
         st.write("")
         
