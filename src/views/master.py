@@ -23,11 +23,13 @@ def render_master_view():
     user_role = st.session_state.get('user_role')
     
     # Conditional Tabs
+    # Conditional Tabs
     if user_role == 'admin':
-        main_tab1, main_tab2, main_tab3 = st.tabs([
+        main_tab1, main_tab2, main_tab3, main_tab4 = st.tabs([
             "機種管理", 
             "構成品マスタ",
-            "カテゴリ設定"
+            "カテゴリ設定",
+            "ユーザー管理"
         ])
     else:
         main_tab1, main_tab2 = st.tabs([
@@ -35,12 +37,59 @@ def render_master_view():
             "構成品マスタ"
         ])
         main_tab3 = None
+        main_tab4 = None
     
     # --- Tab 3: Category Visibility (Admin Only) ---
     if user_role == 'admin' and main_tab3:
         with main_tab3:
             from src.views.master_category import render_category_settings_tab
             render_category_settings_tab()
+
+    # --- Tab 4: User Management (Admin Only) ---
+    if user_role == 'admin' and main_tab4:
+        with main_tab4:
+            st.header("ユーザー権限管理")
+            from src.database import get_all_users, update_user_role
+            users = get_all_users()
+            
+            role_map = {'admin': '管理者', 'related': '関係者', 'user': '一般'}
+            role_options = list(role_map.keys())
+            
+            if users:
+                for u in users:
+                    with st.container(border=True):
+                        c1, c2, c3 = st.columns([3, 2, 1])
+                        c1.write(f"**{u['name']}**")
+                        c1.caption(f"{u['email']}")
+                        
+                        current_role = u.get('role', 'user') or 'user'
+                        # Handle unknown roles
+                        if current_role not in role_options:
+                            current_role = 'user'
+                            
+                        current_idx = role_options.index(current_role)
+                        
+                        new_role = c2.selectbox(
+                            "権限", 
+                            role_options, 
+                            format_func=lambda x: role_map[x],
+                            index=current_idx,
+                            key=f"role_sel_{u['id']}",
+                            label_visibility="collapsed"
+                        )
+                        
+                        if c3.button("更新", key=f"upd_role_{u['id']}"):
+                            if new_role != current_role:
+                                success, msg = update_user_role(u['id'], new_role)
+                                if success:
+                                    st.cache_data.clear()
+                                    st.success(f"{u['name']}の権限を変更しました")
+                                    # If self-update, might need logout? But usually fine until refresh.
+                                    st.rerun()
+                                else:
+                                    st.error(msg)
+                            else:
+                                st.info("変更されていません")
     
     # --- Tab 1: Device Management Hub ---
     with main_tab1:

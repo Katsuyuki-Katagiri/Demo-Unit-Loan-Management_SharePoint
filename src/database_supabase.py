@@ -526,6 +526,15 @@ def update_user_password(user_id: int, new_password: str) -> tuple:
     except Exception as e:
         return False, f"パスワード更新エラー: {e}"
 
+def update_user_role(user_id: int, new_role: str) -> tuple:
+    """ユーザーの権限を更新"""
+    client = get_client()
+    try:
+        client.table("users").update({"role": new_role}).eq("id", user_id).execute()
+        return True, "権限を更新しました"
+    except Exception as e:
+        return False, f"権限更新エラー: {e}"
+
 # --- Categories ---
 
 def seed_categories():
