@@ -13,7 +13,7 @@ from src.database import (
 
 def render_settings_view():
     from src.ui import render_header
-    render_header("通知設定", "settings")
+    render_header("システム設定", "settings")
     
     st.info("通知グループとSMTP設定、およびユーザーを管理します。")
     
@@ -324,23 +324,49 @@ def _render_user_row(u, dept_options_with_none):
     """Render a single user row with department selection and delete button."""
     with st.container(border=True):
         c1, c2, c3, c4, c5 = st.columns([2, 1.5, 1, 0.5, 0.5])
-        role_badge = "👑 管理者" if u['role'] == 'admin' else "👤 一般" if u['role'] == 'user' else "🏢 関連業者"
-        c1.markdown(f"**{u['name']}** ({u['email']})")
-        c2.caption(role_badge)
         
-        # Department selector
+        # 1. Name
+        c1.markdown(f"**{u['name']}**")
+        c1.caption(f"{u['email']}")
+        
+        # 2. Role (Editable)
+        from src.database import update_user_role
+        role_map = {'admin': '👑 管理者', 'related': '🏢 関係者', 'user': '👤 一般'}
+        role_options = list(role_map.keys())
+        current_role = u.get('role', 'user')
+        if current_role not in role_options: current_role = 'user'
+        current_idx = role_options.index(current_role)
+        
+        new_role = c2.selectbox(
+            "権限", 
+            role_options, 
+            format_func=lambda x: role_map[x],
+            index=current_idx, 
+            key=f"role_edit_{u['id']}", 
+            label_visibility="collapsed"
+        )
+        if new_role != current_role:
+             success, msg = update_user_role(u['id'], new_role)
+             if success:
+                 st.cache_data.clear()
+                 st.toast(f"権限を変更しました: {role_map[new_role]}")
+                 st.rerun()
+             else:
+                 st.error(msg)
+        
+        # 3. Department selector
         current_dept_id = u.get('department_id')
         dept_names = list(dept_options_with_none.keys())
-        current_idx = 0
+        current_idx_dept = 0
         for i, (name, did) in enumerate(dept_options_with_none.items()):
             if did == current_dept_id:
-                current_idx = i
+                current_idx_dept = i
                 break
         
         new_dept_name = c3.selectbox(
             "部署",
             dept_names,
-            index=current_idx,
+            index=current_idx_dept,
             key=f"dept_sel_{u['id']}",
             label_visibility="collapsed"
         )

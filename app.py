@@ -1,5 +1,5 @@
 import streamlit as st
-# Force reload: 2026-01-25 17:23
+# Force reload: 2026-01-25 17:33
 import os
 from src.database import init_db, check_users_exist, seed_categories, update_user_password, get_user_by_id
 from src.auth import is_logged_in, logout_user
@@ -124,7 +124,7 @@ def main():
             page_options.append("マスタ管理")
             
         if st.session_state.get('user_role') == 'admin':
-            page_options.append("通知設定")
+            page_options.append("システム設定")
             
         # keyとon_changeを追加して、選択変更時にリセット処理を実行
         selected_page = st.radio("メニュー", page_options, key="nav_selection", on_change=reset_home_state)
@@ -152,7 +152,7 @@ def main():
         render_analytics_view()
     elif selected_page == "マスタ管理":
         render_master_view()
-    elif selected_page == "通知設定":
+    elif selected_page == "システム設定":
         from src.views.settings import render_settings_view
         render_settings_view()
 
