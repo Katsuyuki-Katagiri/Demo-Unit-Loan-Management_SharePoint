@@ -1,5 +1,5 @@
 import streamlit as st
-# Force reload: 2026-01-25 16:505
+# Force reload: 2026-01-25 17:03
 import os
 from src.database import init_db, check_users_exist, seed_categories, update_user_password, get_user_by_id
 from src.auth import is_logged_in, logout_user

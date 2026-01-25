@@ -405,11 +405,11 @@ def render_home_view():
                 
                 # Card HTML
                 html_content += f"""
-<div style="display: flex; flex-direction: row; align-items: center; border: 1px solid {border_color}; border-radius: 8px; padding: 10px; margin-bottom: 10px; height: 120px; background-color: {bg_color};">
+<div style="display: flex; flex-direction: row; align-items: center; border: 1px solid {border_color}; border-radius: 8px; padding: 10px; margin-bottom: 10px; min-height: 140px; background-color: {bg_color};">
 <div style="width: 120px; height: 100px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-right: 15px; background-color: rgba(128, 128, 128, 0.05); border-radius: 4px;">
 {img_tag}
 </div>
-<div style="flex-grow: 1; overflow: hidden;">
+<div style="flex-grow: 1;">
 <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 5px;">
 {name_display}
 {status_badge}
