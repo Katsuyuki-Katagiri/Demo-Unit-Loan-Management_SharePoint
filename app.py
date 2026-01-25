@@ -1,5 +1,5 @@
 import streamlit as st
-# Force reload: 2026-01-25 17:03
+# Force reload: 2026-01-25 17:15
 import os
 from src.database import init_db, check_users_exist, seed_categories, update_user_password, get_user_by_id
 from src.auth import is_logged_in, logout_user
@@ -120,8 +120,10 @@ def main():
         
         page_options.append("分析")
         
-        if st.session_state.get('user_role') == 'admin':
+        if st.session_state.get('user_role') in ['admin', 'related']:
             page_options.append("マスタ管理")
+            
+        if st.session_state.get('user_role') == 'admin':
             page_options.append("通知設定")
             
         # keyとon_changeを追加して、選択変更時にリセット処理を実行

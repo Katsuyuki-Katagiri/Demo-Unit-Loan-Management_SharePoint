@@ -20,145 +20,27 @@ def render_master_view():
     render_header("マスタ管理", "settings")
     
     # Main Tabs
-    main_tab1, main_tab2, main_tab3 = st.tabs([
-        "機種管理", 
-        "構成品マスタ",
-        "カテゴリ設定"
-    ])
+    user_role = st.session_state.get('user_role')
     
-    # --- Tab 3: Category Visibility ---
-    with main_tab3:
-        st.header("カテゴリ表示設定")
-        st.caption("ホーム画面に表示する装置カテゴリのON/OFF、名称変更、管理部署設定、追加・削除が行えます。")
-        
-        from src.database import (
-            update_category_visibility, create_category, 
-            update_category_name, delete_category, update_category_basic_info,
-            move_category_order
-        )
-        
-        # Prepare department options for dropdown
-        departments = get_all_departments()
-        dept_options = {"（未設定）": None}
-        dept_options.update({d['name']: d['id'] for d in departments})
-        dept_map_by_id = {d['id']: d for d in departments}
-        
-        # --- Add New Category ---
-        with st.expander("➕ 新しいカテゴリを追加", expanded=False):
-            with st.form("add_cat_form"):
-                new_cat_name = st.text_input("カテゴリ名")
-                if st.form_submit_button("追加"):
-                    if new_cat_name:
-                        success, msg = create_category(new_cat_name)
-                        if success:
-                            st.cache_data.clear()
-                            st.success(msg)
-                            st.rerun()
-                        else:
-                            st.error(msg)
-                    else:
-                        st.warning("カテゴリ名を入力してください")
-
-        st.divider()
-
-        cats = get_all_categories()
-        # cats rows: id, name, is_visible, managing_department_id
-        
-        if cats:
-            for cat in cats:
-                # Default is_visible=1 if None
-                is_vis = bool(cat['is_visible']) if 'is_visible' in cat.keys() and cat['is_visible'] is not None else True
-                
-                with st.container(border=True):
-                    # Adjusted columns: Name(3), Up(0.5), Down(0.5), UpdateBtn(1), Visible(1), Delete(0.5)
-                    # We need compact columns for arrows
-                    row1_c1, row1_c2, row1_c3, row1_c4, row1_c5, row1_c6 = st.columns([3, 0.4, 0.4, 0.8, 1, 0.5])
-                    
-                    # 1. Edit Name
-                    new_name_input = row1_c1.text_input("名称", value=cat['name'], key=f"cat_name_{cat['id']}", label_visibility="collapsed")
-                    
-                    # 2. Sort Buttons
-                    if row1_c2.button("↑", key=f"mv_up_{cat['id']}", help="上に移動"):
-                        success, msg = move_category_order(cat['id'], 'up')
-                        if success:
-                            st.cache_data.clear()
-                            st.rerun()
-                            
-                    if row1_c3.button("↓", key=f"mv_down_{cat['id']}", help="下に移動"):
-                        success, msg = move_category_order(cat['id'], 'down')
-                        if success:
-                            st.cache_data.clear()
-                            st.rerun()
-
-                    # Description (Full width below)
-                    current_desc = cat['description'] if 'description' in cat.keys() and cat['description'] else ""
-                    new_desc_input = st.text_area("補足説明", value=current_desc, key=f"cat_desc_{cat['id']}", height=68, placeholder="補足説明を入力...")
-
-                    # 3. Update Button (Name & Description only now, sort is handled by buttons)
-                    if row1_c4.button("更新", key=f"upd_cat_{cat['id']}", help="保存"):
-                        if new_name_input:
-                            # Pass 0 or current sort for sort_order arg? 
-                            # Since we don't edit sort order here, we can just pass current or ignore if we update function to be optional
-                            # Re-using update_category_basic_info requires 4 args. 
-                            # Let's pass the current sort_order to avoid overwriting it accidentally, though move_category handles it mostly.
-                            current_sort = cat['sort_order'] if 'sort_order' in cat.keys() else 0
-                            if update_category_basic_info(cat['id'], new_name_input, new_desc_input, current_sort):
-                                st.cache_data.clear()
-                                st.success("更新しました")
-                                st.rerun()
-                            else:
-                                st.error("更新失敗")
-                        else:
-                            st.warning("名称は必須です")
-                    
-                    # 4. Visibility (Toggle)
-                    current_toggle = row1_c5.toggle("表示", value=is_vis, key=f"cat_vis_{cat['id']}")
-                    if current_toggle != is_vis:
-                         update_category_visibility(cat['id'], current_toggle)
-                         st.cache_data.clear()
-                         st.rerun()
-
-                    # 5. Delete Button
-                    if row1_c6.button("🗑️", key=f"del_cat_{cat['id']}", help="削除"):
-                         success, msg = delete_category(cat['id'])
-                         if success:
-                             st.cache_data.clear()
-                             st.success(msg)
-                             st.rerun()
-                         else:
-                             st.error(msg)
-                    
-                    # 5. Managing Department Selection (row 2)
-                    current_dept_id = cat.get('managing_department_id')
-                    current_dept_name = "（未設定）"
-                    if current_dept_id:
-                        dept_info = dept_map_by_id.get(current_dept_id)
-                        if dept_info:
-                            current_dept_name = dept_info['name']
-                    
-                    dept_names = list(dept_options.keys())
-                    current_idx = 0
-                    for i, name in enumerate(dept_names):
-                        if name == current_dept_name:
-                            current_idx = i
-                            break
-                    
-                    row2_c1, row2_c2 = st.columns([1, 3])
-                    row2_c1.caption("管理部署:")
-                    new_dept_name = row2_c2.selectbox(
-                        "管理部署",
-                        dept_names,
-                        index=current_idx,
-                        key=f"cat_dept_{cat['id']}",
-                        label_visibility="collapsed"
-                    )
-                    new_dept_id = dept_options[new_dept_name]
-                    if new_dept_id != current_dept_id:
-                        update_category_managing_department(cat['id'], new_dept_id)
-                        st.cache_data.clear()
-                        st.rerun()
-        else:
-            st.info("カテゴリがありません")
+    # Conditional Tabs
+    if user_role == 'admin':
+        main_tab1, main_tab2, main_tab3 = st.tabs([
+            "機種管理", 
+            "構成品マスタ",
+            "カテゴリ設定"
+        ])
+    else:
+        main_tab1, main_tab2 = st.tabs([
+            "機種管理", 
+            "構成品マスタ"
+        ])
+        main_tab3 = None
+    
+    # --- Tab 3: Category Visibility (Admin Only) ---
+    if user_role == 'admin' and main_tab3:
+        with main_tab3:
+            from src.views.master_category import render_category_settings_tab
+            render_category_settings_tab()
     
     # --- Tab 1: Device Management Hub ---
     with main_tab1:
