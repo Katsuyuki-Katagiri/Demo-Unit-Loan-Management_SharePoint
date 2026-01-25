@@ -1,0 +1,3 @@
+device_units: ['id', 'device_type_id', 'lot_number', 'mfg_date', 'location', 'note', 'status', 'last_check_date', 'next_check_date', 'missing_items']
+items: ['id', 'name', 'tips', 'photo_path']
+check_sessions: ['id', 'session_type', 'loan_id', 'device_unit_id', 'performed_by', 'performed_at', 'device_photo_dir', 'canceled', 'canceled_at', 'canceled_by', 'cancel_reason']
