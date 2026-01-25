@@ -423,7 +423,15 @@ def render_master_view():
             """, unsafe_allow_html=True)
             items = get_all_items()
             for i in items:
-                with st.expander(f"{i['name']}"):
+                # Defensive coding: missing keys protection
+                item_id = i.get('id')
+                if not item_id:
+                    continue
+
+                item_name = i.get('name', '（名称不明）')
+                item_tips = i.get('tips', '')
+
+                with st.expander(f"{item_name}"):
                     c_img, c_txt = st.columns([1, 2])
                     photo_path = i.get('photo_path')
                     if photo_path:
@@ -434,14 +442,14 @@ def render_master_view():
                             fp = os.path.join(UPLOAD_DIR, photo_path)
                             if os.path.exists(fp):
                                 c_img.image(fp)
-                    c_txt.write(i['tips'])
+                    c_txt.write(item_tips)
                     
                     st.divider()
                     st.caption("編集 / 削除")
-                    with st.form(f"edit_item_{i['id']}"):
-                        new_name = st.text_input("構成品名", value=i['name'])
-                        new_tips = st.text_area("Tips", value=i['tips'])
-                        new_file = st.file_uploader("写真更新", key=f"file_{i['id']}")
+                    with st.form(f"edit_item_{item_id}"):
+                        new_name = st.text_input("構成品名", value=item_name)
+                        new_tips = st.text_area("Tips", value=item_tips)
+                        new_file = st.file_uploader("写真更新", key=f"file_{item_id}")
                         
                         c_upd, c_del = st.columns(2)
                         
