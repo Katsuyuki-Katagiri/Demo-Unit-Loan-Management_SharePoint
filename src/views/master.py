@@ -363,6 +363,9 @@ def render_master_view():
                     st.caption("※希望する構成品がない場合は「構成品マスタ」タブから構成品を追加してください")
                     with st.form("add_tpl_line"):
                         all_items = get_all_items()
+                        # "汚れチェック"を除外
+                        all_items = [i for i in all_items if i.get('name') != '汚れチェック']
+                        
                         item_opts = {f"{i['name']}": i['id'] for i in all_items}
                         sel_item_key = st.selectbox("構成品を選択", options=list(item_opts.keys()))
                         req_qty = st.number_input("必要数量", min_value=1, value=1)
