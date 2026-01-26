@@ -60,7 +60,8 @@ def render_master_view():
                     type_name = st.text_input("機種名")
                     if st.form_submit_button("登録"):
                         if type_name:
-                            create_device_type(cat_options[selected_cat], type_name)
+                            new_type_id = create_device_type(cat_options[selected_cat], type_name)
+                            st.session_state['master_selected_type_id'] = new_type_id
                             st.cache_data.clear()
                             st.success(f"登録しました: {type_name}")
                             st.rerun()
