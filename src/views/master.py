@@ -81,6 +81,9 @@ def render_master_view():
             units_by_type = get_device_units_for_types(type_ids) if type_ids else {}
             
             type_opts = {}
+            # ID -> Label Map for reverse lookup
+            id_to_label = {}
+            
             for t in types:
                 units = units_by_type.get(t['id'], [])
                 if units and units[0].get('lot_number'):
@@ -88,7 +91,26 @@ def render_master_view():
                 else:
                     label = f"{t['name']} (ID:{t['id']})"
                 type_opts[label] = t['id']
-            selected_type_key = st.radio("編集する機種を選んでください", options=list(type_opts.keys()))
+                id_to_label[t['id']] = label
+            
+            # Determine initial index from session_state
+            default_index = 0
+            if 'master_selected_type_id' in st.session_state:
+                saved_id = st.session_state['master_selected_type_id']
+                if saved_id in id_to_label:
+                    label = id_to_label[saved_id]
+                    if label in type_opts:
+                        default_index = list(type_opts.keys()).index(label)
+            
+            selected_type_key = st.radio(
+                "編集する機種を選んでください", 
+                options=list(type_opts.keys()),
+                index=default_index
+            )
+            
+            # Update session state immediately
+            if selected_type_key:
+                st.session_state['master_selected_type_id'] = type_opts[selected_type_key]
 
         with col2:
             if selected_type_key:
