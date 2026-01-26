@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS device_units (
     status TEXT DEFAULT 'in_stock',
     last_check_date TEXT,
     next_check_date TEXT,
+    missing_items TEXT,
     UNIQUE(device_type_id, lot_number)
 );
 
