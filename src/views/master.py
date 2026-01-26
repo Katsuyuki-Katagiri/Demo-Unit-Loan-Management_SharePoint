@@ -260,25 +260,99 @@ def render_master_view():
                     # 検索フィルター
                     filter_keyword = st.text_input("🔍 構成品を検索・絞り込み", key="search_tpl_item")
                     
-                    with st.form("add_tpl_line"):
-                        all_items = get_all_items()
-                        # "汚れチェック"を除外 + 検索キーワードでフィルタリング
-                        all_items = [
-                            i for i in all_items 
-                            if i.get('name') != '汚れチェック' 
-                            and (filter_keyword in i.get('name', '') if filter_keyword else True)
-                        ]
+                    all_items = get_all_items()
+                    # "汚れチェック"を除外 + 検索キーワードでフィルタリング
+                    all_items = [
+                        i for i in all_items 
+                        if i.get('name') != '汚れチェック' 
+                        and (filter_keyword.lower() in i.get('name', '').lower() if filter_keyword else True)
+                    ]
+                    
+                    if not all_items:
+                        st.info("該当する構成品がありません")
+                    else:
+                        # 既存の構成品IDを取得（登録済みかどうかの判定用）
+                        existing_item_ids = {line['item_id'] for line in current_lines}
                         
-                        item_opts = {f"{i['name']}": i['id'] for i in all_items}
-                        sel_item_key = st.selectbox("構成品を選択", options=list(item_opts.keys()))
-                        req_qty = st.number_input("必要数量", min_value=1, value=1)
-                        if st.form_submit_button("追加/更新"):
-                            if not sel_item_key:
-                                st.error("構成品を選択してください")
-                            else:
-                                add_template_line(selected_type_id, item_opts[sel_item_key], req_qty)
+                        # セッションステートで選択状態と数量を管理
+                        if 'bulk_add_selections' not in st.session_state:
+                            st.session_state.bulk_add_selections = {}
+                        
+                        st.markdown("**構成品を選択（複数選択可）**")
+                        st.caption("チェックを入れて数量を設定し、「一括登録」ボタンで登録します")
+                        
+                        # 選択用のコンテナ
+                        selection_container = st.container()
+                        with selection_container:
+                            for item in all_items:
+                                item_id = item['id']
+                                item_name = item['name']
+                                is_registered = item_id in existing_item_ids
+                                
+                                # 各構成品の行
+                                col_check, col_name, col_qty = st.columns([1, 4, 2])
+                                
+                                with col_check:
+                                    # チェックボックス
+                                    checked = st.checkbox(
+                                        "選択",
+                                        key=f"bulk_check_{selected_type_id}_{item_id}",
+                                        label_visibility="collapsed"
+                                    )
+                                
+                                with col_name:
+                                    # 構成品名（登録済みの場合はマーク付き）
+                                    if is_registered:
+                                        st.markdown(f"✅ **{item_name}** (登録済み)")
+                                    else:
+                                        st.markdown(f"⬜ {item_name}")
+                                
+                                with col_qty:
+                                    # 数量入力（チェックされている場合のみ有効）
+                                    qty = st.number_input(
+                                        "数量",
+                                        min_value=1,
+                                        value=1,
+                                        key=f"bulk_qty_{selected_type_id}_{item_id}",
+                                        label_visibility="collapsed",
+                                        disabled=not checked
+                                    )
+                                
+                                # 選択状態を保存
+                                if checked:
+                                    st.session_state.bulk_add_selections[item_id] = {
+                                        'name': item_name,
+                                        'qty': qty
+                                    }
+                                elif item_id in st.session_state.bulk_add_selections:
+                                    del st.session_state.bulk_add_selections[item_id]
+                        
+                        # 選択件数の表示と一括登録ボタン
+                        selected_count = sum(
+                            1 for item in all_items 
+                            if st.session_state.get(f"bulk_check_{selected_type_id}_{item['id']}", False)
+                        )
+                        
+                        st.divider()
+                        col_info, col_btn = st.columns([2, 1])
+                        with col_info:
+                            st.info(f"選択中: **{selected_count}件**")
+                        
+                        with col_btn:
+                            if st.button("一括登録", type="primary", disabled=selected_count == 0):
+                                # 選択された構成品を一括登録
+                                registered_count = 0
+                                for item in all_items:
+                                    item_id = item['id']
+                                    if st.session_state.get(f"bulk_check_{selected_type_id}_{item_id}", False):
+                                        qty = st.session_state.get(f"bulk_qty_{selected_type_id}_{item_id}", 1)
+                                        add_template_line(selected_type_id, item_id, qty)
+                                        registered_count += 1
+                                
+                                # 選択状態をクリア
+                                st.session_state.bulk_add_selections = {}
                                 st.cache_data.clear()
-                                st.success("更新しました")
+                                st.success(f"{registered_count}件の構成品を登録しました")
                                 st.rerun()
 
 
