@@ -354,7 +354,8 @@ def render_home_view():
                 st.button("貸出不可 (要対応あり)", disabled=True)
 
         st.subheader("構成品チェックリスト (参照)")
-        checklist = get_synthesized_checklist(unit['device_type_id'], unit['id'])
+        # 参照用なので不足品も含めて表示 (exclude_missing=False)
+        checklist = get_synthesized_checklist(unit['device_type_id'], unit['id'], exclude_missing=False)
         
         if not checklist:
             st.warning("構成品が定義されていません")
