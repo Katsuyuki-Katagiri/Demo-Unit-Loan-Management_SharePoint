@@ -29,7 +29,7 @@ def render_return_view(unit_id: int):
     type_info = get_device_type_by_id(unit['device_type_id'])
     
     from src.ui import render_header
-    render_header("機材返却登録", "assignment_return")
+    render_header("デモ機返却登録", "assignment_return")
     st.markdown(f"**{type_info['name']}** (Lot: {unit['lot_number']})")
     
     # Back Button
