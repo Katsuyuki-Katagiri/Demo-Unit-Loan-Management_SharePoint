@@ -75,9 +75,14 @@ def render_master_view():
                 types = get_device_types(cat_options[filter_cat])
             
             # ロット情報がある場合はロット番号を表示、ない場合はIDを表示
+            # パフォーマンス改善: 一括取得でN+1問題を回避
+            from src.database import get_device_units_for_types
+            type_ids = [t['id'] for t in types]
+            units_by_type = get_device_units_for_types(type_ids) if type_ids else {}
+            
             type_opts = {}
             for t in types:
-                units = get_device_units(t['id'])
+                units = units_by_type.get(t['id'], [])
                 if units and units[0].get('lot_number'):
                     label = f"{t['name']} (Lot:{units[0]['lot_number']})"
                 else:
