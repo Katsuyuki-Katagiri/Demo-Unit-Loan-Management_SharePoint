@@ -267,7 +267,7 @@ def render_master_view():
                             current_missing_ids = {int(m) for m in m_ids if m.isdigit()}
                     
                     st.markdown("**現在の構成:**")
-                    st.caption("🟢 ON = 揃っている | 🔴 OFF = 不足品")
+                    st.caption("🔴 ON = 揃っている | ⚪ OFF = 不足品")
                     
                     # 不足品を追跡するためのリスト
                     missing_items_selected = []
