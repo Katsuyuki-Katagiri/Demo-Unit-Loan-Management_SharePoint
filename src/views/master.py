@@ -94,24 +94,42 @@ def render_master_view():
                 type_opts[label] = t['id']
                 id_to_label[t['id']] = label
             
-            # Determine initial index from session_state
-            default_index = 0
+            # Determine initial selection based on ID
+            # Use 'master_device_selector' key for widget state persistence
+            widget_key = "master_device_selector"
+            
+            # 1. 保存されたIDからラベルを特定
+            target_label = None
             if 'master_selected_type_id' in st.session_state:
                 saved_id = st.session_state['master_selected_type_id']
                 if saved_id in id_to_label:
-                    label = id_to_label[saved_id]
-                    if label in type_opts:
-                        default_index = list(type_opts.keys()).index(label)
+                    target_label = id_to_label[saved_id]
             
+            # 2. ラベルが見つからない（初期状態 or 削除済み）場合は先頭を選択
+            if target_label is None and type_opts:
+                target_label = list(type_opts.keys())[0]
+                
+            # 3. Widgetのセッションステートを強制的に更新（これで選択状態を制御する）
+            if target_label:
+                st.session_state[widget_key] = target_label
+
+            # Callback: ラベル変更時にIDを保存
+            def on_device_select():
+                selected_label = st.session_state[widget_key]
+                if selected_label in type_opts:
+                    st.session_state['master_selected_type_id'] = type_opts[selected_label]
+
+            # 4. Render Radio Button (index引数は使用しない)
             selected_type_key = st.radio(
                 "編集する機種を選んでください", 
                 options=list(type_opts.keys()),
-                index=default_index
+                key=widget_key,
+                on_change=on_device_select
             )
             
-            # Update session state immediately
-            if selected_type_key:
-                st.session_state['master_selected_type_id'] = type_opts[selected_type_key]
+            # 初回レンダリング時などのためにIDも同期しておく
+            if selected_type_key and 'master_selected_type_id' not in st.session_state:
+                 st.session_state['master_selected_type_id'] = type_opts[selected_type_key]
 
         with col2:
             if selected_type_key:
