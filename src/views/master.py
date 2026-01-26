@@ -413,15 +413,20 @@ def render_master_view():
                     st.caption("※希望する構成品がない場合は「構成品マスタ」タブから構成品を追加してください")
                     
                     # 検索フィルター
-                    # Enterキーでの反応を確実にするため、コールバックを設定（空でも動作するが、rerunを明示しても良い）
-                    def on_search_submit():
-                        pass
-                        
-                    filter_keyword = st.text_input(
-                        "🔍 構成品を検索・絞り込み", 
-                        key="search_tpl_item",
-                        on_change=on_search_submit
-                    )
+                    # st.formを使用してEnterキーでの送信を強制する
+                    # これにより、内容が変わっていなくてもEnterで再読み込みがかかる
+                    with st.form(key="search_form"):
+                         col_input, col_btn = st.columns([5, 1])
+                         with col_input:
+                             filter_keyword_input = st.text_input(
+                                "🔍 構成品を検索・絞り込み", 
+                                key="search_tpl_item_input"
+                            )
+                         with col_btn:
+                             st.write("") # Spacer
+                             submit_search = st.form_submit_button("検索")
+
+                    filter_keyword = filter_keyword_input
                     
                     all_items = get_all_items()
                     # "汚れチェック"を除外 + 検索キーワードでフィルタリング
