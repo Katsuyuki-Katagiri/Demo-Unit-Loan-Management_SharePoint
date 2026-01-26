@@ -62,6 +62,12 @@ def render_master_view():
                         if type_name:
                             new_type_id = create_device_type(cat_options[selected_cat], type_name)
                             st.session_state['master_selected_type_id'] = new_type_id
+                            # Widgetの選択状態も更新（これがないと古いラベルのままになるか、リセットされない）
+                            # 次のリロード時にIDからラベルを逆引きしてセットされるが、念のためクリアしておくことで自動設定を促す
+                            # または、ここでラベルを計算できればベストだが、rerunしたほうが安全
+                            if 'master_device_selector' in st.session_state:
+                                del st.session_state['master_device_selector']
+                                
                             st.cache_data.clear()
                             st.success(f"登録しました: {type_name}")
                             st.rerun()
@@ -109,8 +115,16 @@ def render_master_view():
             if target_label is None and type_opts:
                 target_label = list(type_opts.keys())[0]
                 
-            # 3. Widgetのセッションステートを強制的に更新（これで選択状態を制御する）
-            if target_label:
+            # 3. Widgetのセッションステートを更新（条件付き）
+            # 常に上書きするとユーザーの変更を打ち消してしまうため、
+            # 未設定の場合や、現在の選択肢に含まれていない場合のみ更新する
+            should_update_widget = False
+            if widget_key not in st.session_state:
+                should_update_widget = True
+            elif st.session_state[widget_key] not in type_opts:
+                should_update_widget = True
+            
+            if should_update_widget and target_label:
                 st.session_state[widget_key] = target_label
 
             # Callback: ラベル変更時にIDを保存
