@@ -508,8 +508,14 @@ def render_home_view():
                 types_by_name[t['name']]['types'].append(t)
 
             for type_name, group_data in types_by_name.items():
-                # Group Header
-                st.markdown(f"**{type_name}**")
+                # Group Header - 区切り線スタイル
+                st.markdown(f"""
+                    <div style="display: flex; align-items: center; margin: 20px 0 12px 0; gap: 12px;">
+                        <div style="flex: 1; height: 1px; background: #ddd;"></div>
+                        <span style="color: #555; font-size: 1em; font-weight: 600;">{type_name}</span>
+                        <div style="flex: 1; height: 1px; background: #ddd;"></div>
+                    </div>
+                """, unsafe_allow_html=True)
                 
                 # Collect units from ALL types with this name
                 combined_units = []
