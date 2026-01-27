@@ -429,7 +429,7 @@ def render_home_view():
                 <!-- 拡大表示エリア（非表示） -->
                 <div id="expanded_{idx}" style="display: none; margin-bottom: 15px; text-align: center; background: #f8f8f8; border-radius: 8px; padding: 10px;">
                     <img src="{img_src}" style="max-width: 100%; max-height: 70vh; object-fit: contain; cursor: pointer; border-radius: 4px;" onclick="toggleImage({idx}, '{img_src}')">
-                    <div style="margin-top: 8px; color: #666; font-size: 0.9em;">タップして閉じる</div>
+                    <div style="margin-top: 8px; color: #666; font-size: 0.9em;">写真をタップして閉じる</div>
                 </div>
                 '''
             
