@@ -152,13 +152,58 @@ def render_master_view():
                 if selected_label in type_opts:
                     st.session_state['master_selected_type_id'] = type_opts[selected_label]
 
-            # 4. Render Radio Button (index引数は使用しない)
-            selected_type_key = st.radio(
-                "編集する機種を選んでください", 
-                options=list(type_opts.keys()),
-                key=widget_key,
-                on_change=on_device_select
-            )
+            # 4. 機種ごとにグループ化して表示
+            # セクションヘッダー用のスタイル
+            st.markdown("""
+                <style>
+                .device-type-header {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 8px 16px;
+                    border-radius: 8px;
+                    margin-top: 16px;
+                    margin-bottom: 8px;
+                    font-weight: 600;
+                    font-size: 0.95em;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }
+                .device-type-header:first-child {
+                    margin-top: 0;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("##### 編集する機種を選んでください")
+            
+            # 機種ごとにグループ化
+            current_device_name = None
+            for device_name, lot_sort_key, label, type_id in sortable_list:
+                # 機種が変わった場合、ヘッダーを表示
+                if device_name != current_device_name:
+                    current_device_name = device_name
+                    st.markdown(f'<div class="device-type-header">📦 {device_name}</div>', unsafe_allow_html=True)
+                
+                # ロット番号のみを表示（機種名はヘッダーで表示済み）
+                if lot_sort_key != float('inf'):
+                    display_label = f"Lot: {label.split('Lot:')[1].rstrip(')')}" if 'Lot:' in label else label
+                else:
+                    display_label = f"ID: {type_id}" if 'ID:' in label else label
+                
+                # 選択状態を判定
+                is_selected = st.session_state.get(widget_key) == label
+                
+                if st.button(
+                    f"{'🔘' if is_selected else '⚪'} {display_label}",
+                    key=f"device_btn_{type_id}",
+                    use_container_width=True,
+                    type="primary" if is_selected else "secondary"
+                ):
+                    st.session_state[widget_key] = label
+                    st.session_state['master_selected_type_id'] = type_id
+                    st.rerun()
+            
+            # 選択されたラベルを取得
+            selected_type_key = st.session_state.get(widget_key, target_label)
             
             # 初回レンダリング時などのためにIDも同期しておく
             if selected_type_key and 'master_selected_type_id' not in st.session_state:
