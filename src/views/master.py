@@ -146,52 +146,19 @@ def render_master_view():
             if should_update_widget and target_label:
                 st.session_state[widget_key] = target_label
 
+            # 4. ラジオボタンで機種を選択（ソート済みリストを使用）
             # Callback: ラベル変更時にIDを保存
             def on_device_select():
                 selected_label = st.session_state[widget_key]
                 if selected_label in type_opts:
                     st.session_state['master_selected_type_id'] = type_opts[selected_label]
-
-            # 4. 機種ごとにグループ化して表示
-            st.markdown("##### 編集する機種を選んでください")
             
-            # 機種ごとにグループ化
-            device_groups = {}
-            for device_name, lot_sort_key, label, type_id in sortable_list:
-                if device_name not in device_groups:
-                    device_groups[device_name] = []
-                device_groups[device_name].append((label, type_id))
-            
-            # 各機種グループを表示
-            for device_name, items in device_groups.items():
-                # 機種名の区切り線を表示
-                st.markdown(f"""
-                    <div style="display: flex; align-items: center; margin: 16px 0 8px 0; gap: 10px;">
-                        <div style="flex: 1; height: 1px; background: #ddd;"></div>
-                        <span style="color: #555; font-size: 0.9em; font-weight: 600;">{device_name}</span>
-                        <div style="flex: 1; height: 1px; background: #ddd;"></div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                # この機種のラベルリスト
-                labels = [item[0] for item in items]
-                
-                # ラジオボタンを表示
-                selected_in_group = st.radio(
-                    f"{device_name}のロット選択",
-                    options=labels,
-                    key=f"device_group_{device_name}",
-                    label_visibility="collapsed"
-                )
-                
-                # 選択が変更されたらセッションに保存
-                if selected_in_group and selected_in_group in type_opts:
-                    if st.session_state.get(widget_key) != selected_in_group:
-                        st.session_state[widget_key] = selected_in_group
-                        st.session_state['master_selected_type_id'] = type_opts[selected_in_group]
-            
-            # 選択されたラベルを取得
-            selected_type_key = st.session_state.get(widget_key, target_label)
+            selected_type_key = st.radio(
+                "編集する機種を選んでください",
+                options=list(type_opts.keys()),
+                key=widget_key,
+                on_change=on_device_select
+            )
             
             # 初回レンダリング時などのためにIDも同期しておく
             if selected_type_key and 'master_selected_type_id' not in st.session_state:
