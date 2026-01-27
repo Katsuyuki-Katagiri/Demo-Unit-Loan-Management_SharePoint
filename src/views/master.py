@@ -165,7 +165,7 @@ def render_master_view():
                  st.session_state['master_selected_type_id'] = type_opts[selected_type_key]
 
         with col2:
-            if selected_type_key:
+            if selected_type_key and selected_type_key in type_opts:
                 selected_type_id = type_opts[selected_type_key]
                 # Get current type info
                 current_type = next((t for t in types if t['id'] == selected_type_id), None)
