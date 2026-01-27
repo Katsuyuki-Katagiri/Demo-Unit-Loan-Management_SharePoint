@@ -368,154 +368,172 @@ def render_home_view():
                     if x.strip().isdigit():
                         missing_ids.add(int(x.strip()))
 
-            # ライトボックス（画像拡大表示）用のCSS/JavaScript
-            lightbox_style = """
-            <style>
-            /* ライトボックス オーバーレイ */
-            .lightbox-overlay {
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background-color: rgba(0, 0, 0, 0.9);
-                z-index: 9999;
-                justify-content: center;
-                align-items: center;
-                cursor: pointer;
-            }
-            .lightbox-overlay.active {
-                display: flex;
-            }
-            .lightbox-overlay img {
-                max-width: 95%;
-                max-height: 95%;
-                object-fit: contain;
-                border-radius: 8px;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            }
-            /* 閉じるボタン */
-            .lightbox-close {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                color: white;
-                font-size: 40px;
-                font-weight: bold;
-                cursor: pointer;
-                z-index: 10000;
-                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-            }
-            /* タップ可能な画像スタイル */
-            .clickable-image {
-                cursor: pointer;
-                transition: transform 0.2s, box-shadow 0.2s;
-            }
-            .clickable-image:hover {
-                transform: scale(1.05);
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            }
-            /* タップヒント */
-            .tap-hint {
-                position: absolute;
-                bottom: 5px;
-                right: 5px;
-                background: rgba(0, 0, 0, 0.6);
-                color: white;
-                font-size: 0.7em;
-                padding: 2px 6px;
-                border-radius: 4px;
-                pointer-events: none;
-            }
-            </style>
+            import streamlit.components.v1 as components
             
-            <div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
-                <span class="lightbox-close">&times;</span>
-                <img id="lightbox-img" src="" alt="拡大画像">
-            </div>
-            
-            <script>
-            function openLightbox(imgSrc) {
-                var overlay = document.getElementById('lightbox');
-                var lightboxImg = document.getElementById('lightbox-img');
-                lightboxImg.src = imgSrc;
-                overlay.classList.add('active');
-                document.body.style.overflow = 'hidden';
-            }
-            
-            function closeLightbox() {
-                var overlay = document.getElementById('lightbox');
-                overlay.classList.remove('active');
-                document.body.style.overflow = 'auto';
-            }
-            
-            // ESCキーで閉じる
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    closeLightbox();
-                }
-            });
-            </script>
-            """
-            st.markdown(lightbox_style, unsafe_allow_html=True)
-
-            html_content = ""
-            for item in checklist:
+            # 各構成品のデータを準備
+            items_html = ""
+            for idx, item in enumerate(checklist):
                 is_missing = item['item_id'] in missing_ids
                 
-                # Style overrides for missing items
+                # 背景色とボーダー色
                 bg_color = "transparent"
                 border_color = "rgba(128, 128, 128, 0.2)"
                 status_badge = ""
                 
                 if is_missing:
-                    bg_color = "rgba(255, 0, 0, 0.05)" # Light red background
+                    bg_color = "rgba(255, 0, 0, 0.05)"
                     border_color = "rgba(255, 0, 0, 0.3)"
                     status_badge = "<span style='color: red; font-weight: bold; font-size: 0.9em; margin-left: 10px;'>⚠️ 不足しています</span>"
-
-                img_tag = ""
-                img_src = ""  # 拡大表示用のソースURLを保持
+                
+                # 画像ソースの取得
+                img_src = ""
                 if item['photo_path']:
-                    # URLの場合は直接使用、ローカルパスの場合は既存処理
                     if item['photo_path'].startswith('http'):
                         img_src = item['photo_path']
-                        img_tag = f'<img src="{img_src}" class="clickable-image" onclick="openLightbox(\'{img_src}\')" style="max-width: 100%; max-height: 100%; object-fit: contain;" title="タップして拡大">'
                     else:
                         full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
                         if os.path.exists(full_path):
                             b64_str = get_image_base64(full_path)
                             if b64_str:
                                 img_src = f"data:image/png;base64,{b64_str}"
-                                img_tag = f'<img src="{img_src}" class="clickable-image" onclick="openLightbox(\'{img_src}\')" style="max-width: 100%; max-height: 100%; object-fit: contain;" title="タップして拡大">'
-                            else:
-                                img_tag = '<div style="color: #888; font-size: 0.8em;">Image Error</div>'
-                        else:
-                            img_tag = '<div style="color: #888; font-size: 0.8em;">No Image</div>'
+                
+                # 画像タグ作成
+                if img_src:
+                    img_tag = f'''<img src="{img_src}" 
+                        style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: pointer; transition: transform 0.2s;" 
+                        onclick="openLightbox('{img_src}')"
+                        onmouseover="this.style.transform='scale(1.05)'" 
+                        onmouseout="this.style.transform='scale(1)'"
+                        title="タップして拡大">'''
                 else:
                     img_tag = '<div style="color: #888; font-size: 0.8em;">No Image</div>'
-
+                
+                # 名前表示
                 name_display = item['name']
-                if item.get('is_override'): # .get() safer
+                if item.get('is_override'):
                     name_display += " <span style='color: orange; font-size: 0.8em;'>(個体差分)</span>"
                 
-                # Card HTML
-                html_content += f"""
-<div style="display: flex; flex-direction: row; align-items: center; border: 1px solid {border_color}; border-radius: 8px; padding: 10px; margin-bottom: 10px; min-height: 140px; background-color: {bg_color};">
-<div style="width: 120px; height: 100px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-right: 15px; background-color: rgba(128, 128, 128, 0.05); border-radius: 4px;">
-{img_tag}
-</div>
-<div style="flex-grow: 1;">
-<div style="font-weight: bold; font-size: 1.1em; margin-bottom: 5px;">
-{name_display}
-{status_badge}
-</div>
-<div style="font-size: 0.9em;">必要数: <strong>{item['required_qty']}</strong></div>
-</div>
-</div>
-"""
+                items_html += f'''
+                <div style="display: flex; flex-direction: row; align-items: center; border: 1px solid {border_color}; border-radius: 8px; padding: 10px; margin-bottom: 10px; min-height: 120px; background-color: {bg_color};">
+                    <div style="width: 100px; height: 80px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-right: 15px; background-color: rgba(128, 128, 128, 0.05); border-radius: 4px;">
+                        {img_tag}
+                    </div>
+                    <div style="flex-grow: 1;">
+                        <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 5px;">
+                            {name_display}
+                            {status_badge}
+                        </div>
+                        <div style="font-size: 0.9em;">必要数: <strong>{item['required_qty']}</strong></div>
+                    </div>
+                </div>
+                '''
             
-            st.markdown(html_content, unsafe_allow_html=True)
+            # 完全なHTMLコンポーネント（ライトボックス含む）
+            full_html = f'''
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    * {{
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                    }}
+                    body {{
+                        font-family: "Source Sans Pro", sans-serif;
+                        background: transparent;
+                    }}
+                    /* ライトボックス オーバーレイ */
+                    .lightbox-overlay {{
+                        display: none;
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100vw;
+                        height: 100vh;
+                        background-color: rgba(0, 0, 0, 0.95);
+                        z-index: 99999;
+                        justify-content: center;
+                        align-items: center;
+                        cursor: pointer;
+                    }}
+                    .lightbox-overlay.active {{
+                        display: flex;
+                    }}
+                    .lightbox-overlay img {{
+                        max-width: 95vw;
+                        max-height: 95vh;
+                        object-fit: contain;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+                    }}
+                    .lightbox-close {{
+                        position: fixed;
+                        top: 15px;
+                        right: 20px;
+                        color: white;
+                        font-size: 50px;
+                        font-weight: bold;
+                        cursor: pointer;
+                        z-index: 100000;
+                        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+                        line-height: 1;
+                    }}
+                    .lightbox-hint {{
+                        position: fixed;
+                        bottom: 20px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        color: white;
+                        font-size: 14px;
+                        background: rgba(0,0,0,0.5);
+                        padding: 8px 16px;
+                        border-radius: 20px;
+                    }}
+                </style>
+            </head>
+            <body>
+                <!-- ライトボックスオーバーレイ -->
+                <div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
+                    <span class="lightbox-close">&times;</span>
+                    <img id="lightbox-img" src="" alt="拡大画像">
+                    <div class="lightbox-hint">タップして閉じる</div>
+                </div>
+                
+                <!-- チェックリスト表示 -->
+                <div style="padding: 5px;">
+                    {items_html}
+                </div>
+                
+                <script>
+                    function openLightbox(imgSrc) {{
+                        var overlay = document.getElementById('lightbox');
+                        var lightboxImg = document.getElementById('lightbox-img');
+                        lightboxImg.src = imgSrc;
+                        overlay.classList.add('active');
+                        document.body.style.overflow = 'hidden';
+                    }}
+                    
+                    function closeLightbox() {{
+                        var overlay = document.getElementById('lightbox');
+                        overlay.classList.remove('active');
+                        document.body.style.overflow = 'auto';
+                    }}
+                    
+                    // ESCキーで閉じる
+                    document.addEventListener('keydown', function(e) {{
+                        if (e.key === 'Escape') {{
+                            closeLightbox();
+                        }}
+                    }});
+                </script>
+            </body>
+            </html>
+            '''
+            
+            # 高さを動的に計算（アイテム数 × 約140px）
+            component_height = len(checklist) * 140 + 50
+            components.html(full_html, height=component_height, scrolling=True)
 
     # --- Level 2: Device Units List ---
     elif st.session_state.get('selected_type_id'):
