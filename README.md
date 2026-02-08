@@ -175,6 +175,33 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
 > アプリケーションは自動的に環境変数を検出し、SQLiteかSupabaseかを判定します。
 
+### SharePoint同期フォルダモード（推奨）
+
+社内サーバーまたはPCでアプリを実行し、データをSharePoint同期フォルダに保存する構成です。
+Supabaseを使用せず、SQLiteデータベースを使用しながらOneDrive同期経由でSharePointにデータをバックアップします。
+
+**メリット:**
+- 既存のSQLite実装をそのまま使用
+- SharePointにデータを保存（社内ルール準拠）
+- クラウドバックアップ自動化
+
+**セットアップ:**
+1. SharePointサイトに `DemoLoan/data` フォルダを作成
+2. OneDrive同期クライアントで同期設定
+3. `Start_App_SharePoint.bat` のパスを実際の環境に合わせて修正
+4. バッチファイルをダブルクリックして起動
+
+```batch
+REM 環境変数例
+set DEMO_LOAN_DB_PATH=C:\Users\ユーザー名\OneDrive - 会社名\SharePoint\DemoLoan\data\app.db
+set DEMO_LOAN_UPLOAD_DIR=C:\Users\ユーザー名\OneDrive - 会社名\SharePoint\DemoLoan\data\uploads
+```
+
+**同時アクセス対策:**
+- WALモード: SQLiteのWrite-Ahead Loggingモードを有効化し、同時読み書きに対応
+- リトライロジック: データベースロック時は自動的にリトライ
+- 運用ルール: 可能な限り同じ機材の操作は1人が担当
+
 ## クラウドデプロイ
 
 ### Streamlit Cloud

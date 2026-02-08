@@ -17,18 +17,75 @@ if _use_supabase:
 else:
     # SQLite版を使用
     import sqlite3
+    import time
+    import threading
     from typing import Optional, List, Tuple, Dict, Any
     import bcrypt
 
-    DB_PATH = os.path.join("data", "app.db")
-    UPLOAD_DIR = os.path.join("data", "uploads")
+    # 環境変数からパスを取得（SharePoint同期フォルダ対応）
+    # 環境変数が未設定の場合はデフォルトのローカルパスを使用
+    DB_PATH = os.environ.get("DEMO_LOAN_DB_PATH", os.path.join("data", "app.db"))
+    UPLOAD_DIR = os.environ.get("DEMO_LOAN_UPLOAD_DIR", os.path.join("data", "uploads"))
+    
+    # データベースロック用（ファイルベースの排他制御）
+    _db_lock = threading.Lock()
+    
+    def get_db_connection(timeout: float = 30.0):
+        """
+        データベース接続を取得（WALモード対応）
+        
+        Args:
+            timeout: タイムアウト秒数
+        
+        Returns:
+            sqlite3.Connection
+        """
+        conn = sqlite3.connect(DB_PATH, timeout=timeout)
+        # WALモードを有効化（同時読み書き対応）
+        conn.execute("PRAGMA journal_mode=WAL")
+        # 忙しい時のリトライ待機を設定
+        conn.execute("PRAGMA busy_timeout=30000")
+        return conn
+    
+    def execute_with_retry(func, max_retries: int = 5, base_delay: float = 0.5):
+        """
+        データベース操作をリトライ付きで実行
+        
+        Args:
+            func: 実行する関数（引数なし）
+            max_retries: 最大リトライ回数
+            base_delay: 基本待機時間（秒）
+        
+        Returns:
+            関数の戻り値
+        """
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                return func()
+            except sqlite3.OperationalError as e:
+                last_error = e
+                if "database is locked" in str(e) or "database is busy" in str(e):
+                    if attempt < max_retries - 1:
+                        delay = base_delay * (2 ** attempt)  # 指数バックオフ
+                        print(f"データベースがロック中。{delay:.1f}秒後にリトライ... (試行 {attempt + 1}/{max_retries})")
+                        time.sleep(delay)
+                    else:
+                        raise
+                else:
+                    raise
+        raise last_error
 
 
 def init_db():
     """Initialize the database with all tables for Phase 1."""
-    os.makedirs("data", exist_ok=True)
+    # データベースファイルの親ディレクトリを作成（SharePoint同期フォルダ対応）
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    
+    conn = get_db_connection()
     c = conn.cursor()
     
     # Phase 0 Tables
@@ -430,6 +487,19 @@ def update_user_password(user_id: int, new_password: str) -> tuple:
         return True, "パスワードを更新しました。"
     except Exception as e:
         return False, f"パスワード更新エラー: {e}"
+    finally:
+        conn.close()
+
+def update_user_role(user_id: int, new_role: str) -> tuple:
+    """ユーザーの権限を更新"""
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        c.execute("UPDATE users SET role = ? WHERE id = ?", (new_role, user_id))
+        conn.commit()
+        return True, "権限を更新しました"
+    except Exception as e:
+        return False, f"権限更新エラー: {e}"
     finally:
         conn.close()
 
@@ -838,6 +908,16 @@ def get_device_units(device_type_id: int):
     c = conn.cursor()
     c.execute("SELECT * FROM device_units WHERE device_type_id = ?", (device_type_id,))
     res = c.fetchall()
+    conn.close()
+    return res
+
+def get_all_device_units():
+    """全個体を一括取得（バッチクエリ用）"""
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM device_units")
+    res = [dict(row) for row in c.fetchall()]
     conn.close()
     return res
 
@@ -1814,3 +1894,148 @@ def get_loan_periods_for_unit(device_unit_id: int):
     conn.close()
     return res
 
+# --- Batch取得関数（N+1問題対策） ---
+
+def get_device_units_for_types(type_ids: list):
+    """
+    複数の機種の個体を一括取得
+    
+    Returns:
+        {type_id: [unit1, unit2, ...], ...} のディクショナリ
+    """
+    if not type_ids:
+        return {}
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    placeholders = ','.join(['?']*len(type_ids))
+    c.execute(f"SELECT * FROM device_units WHERE device_type_id IN ({placeholders})", type_ids)
+    
+    # 機種IDでグループ化
+    units_by_type = {}
+    for row in c.fetchall():
+        unit = dict(row)
+        type_id = unit['device_type_id']
+        if type_id not in units_by_type:
+            units_by_type[type_id] = []
+        units_by_type[type_id].append(unit)
+    
+    conn.close()
+    return units_by_type
+
+def get_users_batch(user_ids: list):
+    """
+    複数のユーザーを一括取得
+    
+    Returns:
+        {user_id: user_dict, ...} のディクショナリ
+    """
+    if not user_ids:
+        return {}
+    # 重複を除去
+    unique_ids = list(set(user_ids))
+    
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    placeholders = ','.join(['?']*len(unique_ids))
+    c.execute(f"SELECT * FROM users WHERE id IN ({placeholders})", unique_ids)
+    
+    result = {row['id']: dict(row) for row in c.fetchall()}
+    conn.close()
+    return result
+
+def get_active_loans_batch(unit_ids: list):
+    """
+    複数個体のアクティブな貸出を一括取得
+    
+    Returns:
+        {unit_id: loan_dict, ...} のディクショナリ（貸出中の個体のみ）
+    """
+    if not unit_ids:
+        return {}
+    
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    placeholders = ','.join(['?']*len(unit_ids))
+    c.execute(f"""
+        SELECT * FROM loans 
+        WHERE device_unit_id IN ({placeholders}) 
+        AND status = 'open' 
+        AND (canceled = 0 OR canceled IS NULL)
+    """, unit_ids)
+    
+    result = {row['device_unit_id']: dict(row) for row in c.fetchall()}
+    conn.close()
+    return result
+
+def get_check_sessions_batch(loan_ids: list):
+    """
+    複数貸出のチェックセッションを一括取得
+    
+    Returns:
+        {loan_id: [session1, session2, ...], ...}
+    """
+    if not loan_ids:
+        return {}
+    
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    placeholders = ','.join(['?']*len(loan_ids))
+    c.execute(f"""
+        SELECT * FROM check_sessions 
+        WHERE loan_id IN ({placeholders}) 
+        AND (canceled = 0 OR canceled IS NULL)
+        ORDER BY id
+    """, loan_ids)
+    
+    sessions_by_loan = {}
+    for row in c.fetchall():
+        sess = dict(row)
+        loan_id = sess['loan_id']
+        if loan_id not in sessions_by_loan:
+            sessions_by_loan[loan_id] = []
+        sessions_by_loan[loan_id].append(sess)
+    
+    conn.close()
+    return sessions_by_loan
+
+def get_check_lines_batch(session_ids: list):
+    """
+    複数セッションのチェック明細を一括取得
+    
+    Returns:
+        {session_id: [line1, line2, ...], ...}
+    """
+    if not session_ids:
+        return {}
+    
+    conn = get_db_connection()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    placeholders = ','.join(['?']*len(session_ids))
+    # JOINでアイテム名・写真パスも取得
+    c.execute(f"""
+        SELECT cl.*, i.name as item_name, i.photo_path
+        FROM check_lines cl
+        LEFT JOIN items i ON cl.item_id = i.id
+        WHERE cl.check_session_id IN ({placeholders})
+    """, session_ids)
+    
+    lines_by_session = {}
+    for row in c.fetchall():
+        line = dict(row)
+        session_id = line['check_session_id']
+        if session_id not in lines_by_session:
+            lines_by_session[session_id] = []
+        lines_by_session[session_id].append(line)
+    
+    conn.close()
+    return lines_by_session
